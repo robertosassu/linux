@@ -23,5 +23,7 @@ extern int pgp_verify_sig_end(struct pgp_sig_verify *ctx,
 			      const u8 *sig, size_t siglen, bool *_trusted);
 extern void pgp_verify_sig_cancel(struct pgp_sig_verify *ctx);
 
+extern __init int preload_pgp_keys(const u8 *pgpdata, size_t pgpdatalen,
+				   struct key *keyring);
 
 #endif /* _LINUX_PGP_SIG_H */
