@@ -1136,7 +1136,8 @@ static bool ima_validate_rule(struct ima_rule_entry *entry)
 
 	if (entry->action != APPRAISE &&
 	    entry->flags & (IMA_DIGSIG_REQUIRED | IMA_MODSIG_ALLOWED |
-			    IMA_CHECK_BLACKLIST | IMA_VALIDATE_ALGOS))
+			    IMA_CHECK_BLACKLIST | IMA_VALIDATE_ALGOS |
+			    IMA_META_IMMUTABLE_REQUIRED))
 		return false;
 
 	/*
@@ -1166,7 +1167,8 @@ static bool ima_validate_rule(struct ima_rule_entry *entry)
 				     IMA_UID | IMA_FOWNER | IMA_FSUUID |
 				     IMA_INMASK | IMA_EUID | IMA_PCR |
 				     IMA_FSNAME | IMA_DIGSIG_REQUIRED |
-				     IMA_PERMIT_DIRECTIO | IMA_VALIDATE_ALGOS))
+				     IMA_PERMIT_DIRECTIO | IMA_VALIDATE_ALGOS |
+				     IMA_META_IMMUTABLE_REQUIRED))
 			return false;
 
 		break;
@@ -1178,7 +1180,8 @@ static bool ima_validate_rule(struct ima_rule_entry *entry)
 				     IMA_INMASK | IMA_EUID | IMA_PCR |
 				     IMA_FSNAME | IMA_DIGSIG_REQUIRED |
 				     IMA_PERMIT_DIRECTIO | IMA_MODSIG_ALLOWED |
-				     IMA_CHECK_BLACKLIST | IMA_VALIDATE_ALGOS))
+				     IMA_CHECK_BLACKLIST | IMA_VALIDATE_ALGOS |
+				     IMA_META_IMMUTABLE_REQUIRED))
 			return false;
 
 		break;
@@ -1599,6 +1602,8 @@ static int ima_parse_rule(char *rule, struct ima_rule_entry *entry)
 				 strcmp(args[0].from, "imasig|modsig") == 0)
 				entry->flags |= IMA_DIGSIG_REQUIRED |
 						IMA_MODSIG_ALLOWED;
+			else if (strcmp(args[0].from, "meta_immutable") == 0)
+				entry->flags |= IMA_META_IMMUTABLE_REQUIRED;
 			else
 				result = -EINVAL;
 			break;
@@ -1999,6 +2004,8 @@ int ima_policy_show(struct seq_file *m, void *v)
 	}
 	if (entry->flags & IMA_CHECK_BLACKLIST)
 		seq_puts(m, "appraise_flag=check_blacklist ");
+	if (entry->flags & IMA_META_IMMUTABLE_REQUIRED)
+		seq_puts(m, "appraise_type=meta_immutable ");
 	if (entry->flags & IMA_PERMIT_DIRECTIO)
 		seq_puts(m, "permit_directio ");
 	rcu_read_unlock();
