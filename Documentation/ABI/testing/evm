@@ -49,8 +49,30 @@ Description:
 		modification of EVM-protected metadata and
 		disable all further modification of policy
 
-		Note that once a key has been loaded, it will no longer be
-		possible to enable metadata modification.
+		Echoing a value is additive, the new value is added to the
+		existing initialization flags.
+
+		For example, after::
+
+		  echo 2 ><securityfs>/evm
+
+		another echo can be performed::
+
+		  echo 4 ><securityfs>/evm
+
+		and the resulting value will be 6.
+
+		Note that once an HMAC key has been loaded, it will no longer
+		be possible to echo the value for metadata modification.
+		Signaling that an HMAC key has been loaded will clear the flag
+		for metadata verification. If the current value is 6::
+
+		  echo 1 ><securityfs>/evm
+
+		will set the new value to 3.
+
+		Loading an HMAC key is the only way to disable metadata
+		modification.
 
 		Until key loading has been signaled EVM can not create
 		or validate the 'security.evm' xattr, but returns
