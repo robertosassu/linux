@@ -33,6 +33,7 @@ struct xattr_list {
 };
 
 extern int evm_initialized;
+extern enum hash_algo evm_hash_algo;
 
 #define EVM_ATTR_FSUUID		0x0001
 
@@ -50,6 +51,7 @@ struct evm_digest {
 } __packed;
 
 int evm_init_key(void);
+int __init evm_init_crypto(void);
 int evm_update_evmxattr(struct dentry *dentry,
 			const char *req_xattr_name,
 			const char *req_xattr_value,
