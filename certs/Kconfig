@@ -126,4 +126,15 @@ config SYSTEM_REVOCATION_KEYS
 	  containing X.509 certificates to be included in the default blacklist
 	  keyring.
 
+config PGP_PRELOAD_PUBLIC_KEYS
+	bool "Preload PGP public keys"
+	depends on SYSTEM_TRUSTED_KEYRING
+	select PGP_PRELOAD
+	default n
+	help
+	  Load at boot time the PGP public keys from a reserved area (populated
+	  with the content of 'certs/pubring.gpg' provided at kernel build
+	  time), and add them to the built-in keyring. Invalid keys are ignored
+	  and the loading continues.
+
 endmenu
