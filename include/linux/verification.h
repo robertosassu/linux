@@ -9,6 +9,7 @@
 #define _LINUX_VERIFICATION_H
 
 #include <linux/types.h>
+#include <linux/key.h>
 
 /*
  * Indicate that both builtin trusted keys and secondary trusted keys
@@ -59,6 +60,9 @@ extern int verify_pefile_signature(const void *pebuf, unsigned pelen,
 				   struct key *trusted_keys,
 				   enum key_being_used_for usage);
 #endif
+
+struct key *search_trusted_key(struct key *trusted_keys, struct key_type *type,
+			       char *name);
 
 #endif /* CONFIG_SYSTEM_DATA_VERIFICATION */
 #endif /* _LINUX_VERIFY_PEFILE_H */
