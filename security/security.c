@@ -1562,6 +1562,13 @@ int security_inode_removexattr(struct mnt_idmap *idmap,
 	return evm_inode_removexattr(idmap, dentry, name);
 }
 
+void security_inode_post_removexattr(struct dentry *dentry, const char *name)
+{
+	if (unlikely(IS_PRIVATE(d_backing_inode(dentry))))
+		return;
+	call_void_hook(inode_post_removexattr, dentry, name);
+}
+
 int security_inode_need_killpriv(struct dentry *dentry)
 {
 	return call_int_hook(inode_need_killpriv, 0, dentry);
