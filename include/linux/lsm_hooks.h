@@ -432,6 +432,9 @@
  *	Check permission before removing the extended attribute
  *	identified by @name for @dentry.
  *	Return 0 if permission is granted.
+ * @inode_post_removexattr:
+ *	Update inode security field after successful removal of extended
+ *	attribute identified by @name for @dentry in @mnt_userns.
  * @inode_getsecurity:
  *	Retrieve a copy of the extended attribute representation of the
  *	security label associated with @name for @inode via @buffer.  Note that
