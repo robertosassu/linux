@@ -3764,6 +3764,9 @@ retry:
 					  dentry, mode, 0);
 			break;
 	}
+
+	if (!error)
+		security_path_post_mknod(mnt_userns, &path, dentry, mode, dev);
 out:
 	done_path_create(&path, dentry);
 	if (retry_estale(error, lookup_flags)) {
