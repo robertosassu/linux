@@ -1688,6 +1688,11 @@ int security_file_alloc(struct file *file)
 	return rc;
 }
 
+void security_file_pre_free(struct file *file)
+{
+	call_void_hook(file_pre_free_security, file);
+}
+
 void security_file_free(struct file *file)
 {
 	void *blob;
