@@ -345,6 +345,14 @@
  *	@dev contains the undecoded device number. Use new_decode_dev() to get
  *	the decoded device number.
  *	Return 0 if permission is granted.
+ * @path_post_mknod:
+ *	Update inode security field after a file has been created.
+ *	@mnt_userns is the user namespace of the mount.
+ *	@dir contains the path structure of parent of the new file.
+ *	@dentry contains the dentry structure of the new file.
+ *	@mode contains the mode of the new file.
+ *	@dev contains the undecoded device number. Use new_decode_dev() to get
+ *	the decoded device number.
  * @inode_rename:
  *	Check for permission to rename a file or directory.
  *	@old_dir contains the inode structure for parent of the old link.
