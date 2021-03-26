@@ -1248,6 +1248,15 @@ int security_path_mknod(const struct path *dir, struct dentry *dentry, umode_t m
 }
 EXPORT_SYMBOL(security_path_mknod);
 
+void security_path_post_mknod(struct mnt_idmap *idmap,
+			      const struct path *dir, struct dentry *dentry,
+			      umode_t mode, unsigned int dev)
+{
+	if (unlikely(IS_PRIVATE(d_backing_inode(dir->dentry))))
+		return;
+	call_void_hook(path_post_mknod, idmap, dir, dentry, mode, dev);
+}
+
 int security_path_mkdir(const struct path *dir, struct dentry *dentry, umode_t mode)
 {
 	if (unlikely(IS_PRIVATE(d_backing_inode(dir->dentry))))
