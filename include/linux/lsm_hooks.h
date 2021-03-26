@@ -633,6 +633,11 @@
  *	file_permission, and recheck access if anything has changed
  *	since inode_permission.
  *	Return 0 if permission is granted.
+ * @file_post_open:
+ *	Recheck access with mask @mask after the file @file has been opened.
+ *	This hook is useful for LSMs that require the file content to be
+ *	available in order to make decisions.
+ *	Return 0 if permission is granted.
  *
  * Security hooks for task operations.
  *
