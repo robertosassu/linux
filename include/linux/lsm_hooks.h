@@ -555,6 +555,9 @@
  *	created.
  *	@file contains the file structure to secure.
  *	Return 0 if the hook is successful and permission is granted.
+ * @file_pre_free_security:
+ *	Perform actions before the file descriptor @file is freed.
+ *	@file contains the file structure being modified.
  * @file_free_security:
  *	Deallocate and free any security structures stored in file->f_security.
  *	@file contains the file structure being modified.
