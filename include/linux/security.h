@@ -374,6 +374,7 @@ int security_inode_getxattr(struct dentry *dentry, const char *name);
 int security_inode_listxattr(struct dentry *dentry);
 int security_inode_removexattr(struct user_namespace *mnt_userns,
 			       struct dentry *dentry, const char *name);
+void security_inode_post_removexattr(struct dentry *dentry, const char *name);
 int security_inode_need_killpriv(struct dentry *dentry);
 int security_inode_killpriv(struct user_namespace *mnt_userns,
 			    struct dentry *dentry);
@@ -919,6 +920,10 @@ static inline int security_inode_removexattr(struct user_namespace *mnt_userns,
 {
 	return cap_inode_removexattr(mnt_userns, dentry, name);
 }
+
+static inline void security_inode_post_removexattr(struct dentry *dentry,
+						   const char *name)
+{ }
 
 static inline int security_inode_need_killpriv(struct dentry *dentry)
 {
