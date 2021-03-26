@@ -533,6 +533,7 @@ __vfs_removexattr_locked(struct user_namespace *mnt_userns,
 
 	if (!error) {
 		fsnotify_xattr(dentry);
+		security_inode_post_removexattr(dentry, name);
 		evm_inode_post_removexattr(dentry, name);
 	}
 
