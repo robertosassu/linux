@@ -442,6 +442,9 @@
  *	Check permission before removing the extended attribute
  *	identified by @name for @dentry.
  *	Return 0 if permission is granted.
+ * @inode_post_removexattr:
+ *	Update inode security field after successful removal of extended
+ *	attribute identified by @name for @dentry.
  * @inode_set_acl:
  *	Check permission before setting posix acls
  *	The posix acls in @kacl are identified by @acl_name.
