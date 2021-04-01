@@ -31,6 +31,6 @@ jobs:
             - /root/project/.git
       - run: make ARCH=um -j4
       - store_artifacts:
-          paths:
-            - /root/project/linux
-            - /root/project/certs/signing_key.pem
+          path: /root/project/linux
+      - store_artifacts:
+          path: /root/project/certs/signing_key.pem
