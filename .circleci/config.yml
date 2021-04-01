@@ -20,6 +20,6 @@ jobs:
       - image: buildpack-deps:trusty
     resource_class: xlarge
     steps:
-      - run: apt-get install bison flex
+      - run: apt-get install build-essential
       - checkout
       - run: make ARCH=um -j8
