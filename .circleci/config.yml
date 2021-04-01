@@ -23,11 +23,10 @@ jobs:
       - run: apt-get update
       - run: apt-get --yes --force-yes install bison flex libssl-dev build-essential make bc
       - restore_cache:
-        keys:
-        - repo
+          key: repo
       - checkout
       - save_cache:
-        key: repo
-        paths:
-        - /root/project/.git
+          key: repo
+          paths:
+            - /root/project/.git
       - run: make ARCH=um -j8
