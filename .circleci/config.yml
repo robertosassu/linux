@@ -14,13 +14,13 @@ workflows:
 
 jobs:
   build:
-    machine:
-      image: ubuntu-2004:202010-01
-    resource_class: large
+    docker:
+      - image: buildpack-deps:trusty
+    resource_class: xlarge
+    filters:
+      branches:
+        only: ima-evm-fixes-v5-devel-v1
     steps:
       - checkout
       - run: make ARCH=um -j8
 
-filters:
-  branches:
-    only: ima-evm-fixes-v5-devel-v1
