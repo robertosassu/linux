@@ -21,6 +21,6 @@ jobs:
     resource_class: xlarge
     steps:
       - run: apt-get update
-      - run: apt-get --yes --force-yes install bison flex libssl-dev build-essential make
+      - run: apt-get --yes --force-yes install bison flex libssl-dev build-essential make bc
       - checkout
       - run: make ARCH=um -j8
