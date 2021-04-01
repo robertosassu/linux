@@ -19,7 +19,7 @@ jobs:
     resource_class: large
     steps:
       - checkout
-      - run: make -j8
+      - run: make ARCH=um -j8
 
 filters:
   branches:
