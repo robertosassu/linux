@@ -21,6 +21,6 @@ jobs:
     resource_class: xlarge
     steps:
       - run: apt-get update
-      - run: apt-get install --force-yes bison flex openssl libssl-dev
+      - run: apt-get --yes --force-yes install bison flex openssl libssl-dev
       - checkout
       - run: make ARCH=um -j8
