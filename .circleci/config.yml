@@ -10,17 +10,15 @@ workflows:
   welcome:
     # Run the welcome/run job in its own container
     jobs:
-      - build
-
+      - build:
+        filters:
+          branches:
+            only: ima-evm-fixes-v5-devel-v1
 jobs:
   build:
     docker:
       - image: buildpack-deps:trusty
     resource_class: xlarge
-    filters:
-      branches:
-        only: ima-evm-fixes-v5-devel-v1
     steps:
       - checkout
       - run: make ARCH=um -j8
-
