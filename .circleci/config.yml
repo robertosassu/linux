@@ -20,7 +20,7 @@ jobs:
       - image: buildpack-deps:focal-scm
     resource_class: xlarge
     steps:
-      - run: ls -l /usr/bin/bison
-      - run: ls -l /usr/bin/flex
+      - run: apt-get update
+      - run: apt-get install bison flex
       - checkout
       - run: make ARCH=um -j8
