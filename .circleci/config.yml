@@ -17,9 +17,10 @@ workflows:
 jobs:
   build:
     docker:
-      - image: buildpack-deps:trusty
+      - image: buildpack-deps:focal-scm
     resource_class: xlarge
     steps:
-      - run: apt-get install build-essential
+      - run: ls -l /usr/bin/bison
+      - run: ls -l /usr/bin/flex
       - checkout
       - run: make ARCH=um -j8
