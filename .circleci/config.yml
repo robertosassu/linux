@@ -17,10 +17,10 @@ workflows:
 jobs:
   build:
     docker:
-      - image: buildpack-deps:focal-scm
+      - image: buildpack-deps:focal
     resource_class: xlarge
     steps:
       - run: apt-get update
-      - run: apt-get --yes --force-yes install bison flex openssl libssl-dev
+      - run: apt-get --yes --force-yes install bison flex libssl-dev build-essential make
       - checkout
       - run: make ARCH=um -j8
