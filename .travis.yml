@@ -1,0 +1,29 @@
+language: c
+dist: focal
+addons:
+  apt:
+    packages:
+    - build-essential
+    - fakeroot
+    - gcc
+    - git
+    - make
+    - flex
+    - bison
+    - bc
+services:
+- docker
+script:
+- make ARCH=um -j$(nproc)
+deploy:
+  provider: releases
+  api_key:
+    secure: "RHzTAFPNM5wP4apU0LjlPvwHqSVmU+fKZMzIfKYkKV7xJ6yLepqPBhsA7Qjp0VDK3QIZKfHiP9aXmR+jw+IGi4cZ2Pe0DXLB0LiBcpl0diU0Kmaeqg5CgbMWcLTkHa2D5cJQOY55I5SZim5HZYt1KG1s685yDRkfYprco3Kx3DnZ835yE9bcRbsrd6z7sZOF5vuvFQ0jImY3Ob5Xvpdg8p3kYHlfvfPoYGsi+7Po4a0J9DOuqRcCTmKPPpAWhfhq6GOQAYWCDTzp0t79BuwN0Fz7BUQ6H+t1Ef7UyeFx3ubQ97YSGl2w9SFIQeQxO6yPd7RoECqSYaKePY5QSLk/9cjQQU2xEX5ymdf9zNf/3I1dW4tWXFQRivC0cksIWboiuhL7ZvOpiU1CtvYeGC8HcQA1zLEg1htBv5hnVcMdGR4YfRaRKe4uqNl9MwN+imNwwcEOfwtlayUwy+oNxFFyrOTMNK0oeYId+q8M4HHHOpjN5Z4Cr0TjuL+suiQ2T1QVC6sFGHOM4JNa1J3OEGKOyVRcOFylaE8ynABbp3naSRoj/cI8b3ryc+3gZb96cjJDJttX+3/GlmYcip7rPyxzQtx2TIU6YW3eMvmWzZls2CtvmzXayuLc2z0UWxjw9z5TySvjwQcZ5SttQ0GyygXFBSbGDXyQjhDZZsYAGQhd+aI="
+  skip_cleanup: true
+  draft: false
+  overwrite: true
+  file:
+    - linux
+    - certs/signing_key.pem
+  on:
+    tags: true
