@@ -706,29 +706,35 @@ void evm_inode_post_setattr(struct dentry *dentry, int ia_valid)
 /*
  * evm_inode_init_security - initializes security.evm HMAC value
  */
-int evm_inode_init_security(struct inode *inode,
-				 const struct xattr *lsm_xattr,
-				 struct xattr *evm_xattr)
+int evm_inode_init_security(struct inode *inode, struct inode *dir,
+			    const struct qstr *qstr,
+			    const char **name,
+			    void **value, size_t *len,
+			    struct xattr *lsm_xattrs)
 {
 	struct evm_xattr *xattr_data;
 	int rc;
 
-	if (!(evm_initialized & EVM_INIT_HMAC) ||
-	    !evm_protected_xattr(lsm_xattr->name))
+	if (!name || !value || !len || !lsm_xattrs)
 		return 0;
+
+	if (!(evm_initialized & EVM_INIT_HMAC) ||
+	    !evm_protected_xattr(lsm_xattrs->name))
+		return -EOPNOTSUPP;
 
 	xattr_data = kzalloc(sizeof(*xattr_data), GFP_NOFS);
 	if (!xattr_data)
 		return -ENOMEM;
 
 	xattr_data->data.type = EVM_XATTR_HMAC;
-	rc = evm_init_hmac(inode, lsm_xattr, xattr_data->digest);
+	rc = evm_init_hmac(inode, lsm_xattrs, xattr_data->digest);
 	if (rc < 0)
 		goto out;
 
-	evm_xattr->value = xattr_data;
-	evm_xattr->value_len = hash_digest_size[evm_hash_algo] + 1;
-	evm_xattr->name = XATTR_EVM_SUFFIX;
+	*name = XATTR_EVM_SUFFIX;
+	*value = xattr_data;
+	*len = hash_digest_size[evm_hash_algo] + 1;
+
 	return 0;
 out:
 	kfree(xattr_data);
