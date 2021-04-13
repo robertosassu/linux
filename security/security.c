@@ -34,7 +34,9 @@
 	((IS_ENABLED(CONFIG_EVM) ? 1 : 0) +              \
 	 (IS_ENABLED(CONFIG_SECURITY_SELINUX) ? 1 : 0) + \
 	 (IS_ENABLED(CONFIG_SECURITY_SMACK) ? 1 : 0) +   \
-	 (IS_ENABLED(CONFIG_BPF_LSM) ? 1 : 0))
+	 (IS_ENABLED(CONFIG_BPF_LSM) ? 1 : 0) +          \
+	 (IS_ENABLED(CONFIG_SECURITY_TESTLSM) ? 1 : 0))
+
 
 /* How many LSMs were built into the kernel? */
 #define LSM_COUNT (__end_lsm_info - __start_lsm_info)
