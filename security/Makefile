@@ -36,3 +36,6 @@ obj-$(CONFIG_BPF_LSM)			+= bpf/
 # Object integrity file lists
 subdir-$(CONFIG_INTEGRITY)		+= integrity
 obj-$(CONFIG_INTEGRITY)			+= integrity/
+
+subdir-$(CONFIG_SECURITY_TESTLSM)	+= testlsm
+obj-$(CONFIG_SECURITY_TESTLSM)		+= testlsm/
