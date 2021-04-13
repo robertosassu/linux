@@ -210,6 +210,8 @@ source "security/landlock/Kconfig"
 
 source "security/integrity/Kconfig"
 
+source "security/testlsm/Kconfig"
+
 choice
 	prompt "First legacy 'major LSM' to be initialized"
 	default DEFAULT_SECURITY_SELINUX if SECURITY_SELINUX
