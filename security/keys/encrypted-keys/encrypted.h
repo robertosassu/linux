@@ -2,7 +2,7 @@
 #ifndef __ENCRYPTED_KEY_H
 #define __ENCRYPTED_KEY_H
 
-#define ENCRYPTED_DEBUG 0
+#define ENCRYPTED_DEBUG 1
 #if defined(CONFIG_TRUSTED_KEYS) || \
   (defined(CONFIG_TRUSTED_KEYS_MODULE) && defined(CONFIG_ENCRYPTED_KEYS_MODULE))
 extern struct key *request_trusted_key(const char *trusted_desc,
