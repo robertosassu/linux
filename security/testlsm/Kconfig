@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: GPL-2.0-only
+config SECURITY_TESTLSM
+	bool "TestLSM"
+	depends on SECURITY
+	help
+	  This is a test LSM.
