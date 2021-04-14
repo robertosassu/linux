@@ -965,12 +965,14 @@ static int smack_inode_alloc_security(struct inode *inode)
  * @name: where to put the attribute name
  * @value: where to put the attribute value
  * @len: where to put the length of the attribute
+ * @lsm_xattrs: unused
  *
  * Returns 0 if it all works out, -ENOMEM if there's no memory
  */
 static int smack_inode_init_security(struct inode *inode, struct inode *dir,
 				     const struct qstr *qstr, const char **name,
-				     void **value, size_t *len)
+				     void **value, size_t *len,
+				     struct xattr *lsm_xattrs)
 {
 	struct inode_smack *issp = smack_inode(inode);
 	struct smack_known *skp = smk_of_current();

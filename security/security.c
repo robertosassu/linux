@@ -1036,7 +1036,7 @@ int security_inode_init_security(struct inode *inode, struct inode *dir,
 
 	if (!initxattrs)
 		return call_int_hook(inode_init_security, -EOPNOTSUPP, inode,
-				     dir, qstr, NULL, NULL, NULL);
+				     dir, qstr, NULL, NULL, NULL, NULL);
 
 	/* Determine at run-time the max number of xattr structs to allocate. */
 	hlist_for_each_entry(P, &security_hook_heads.inode_init_security, list)
@@ -1056,7 +1056,8 @@ int security_inode_init_security(struct inode *inode, struct inode *dir,
 		ret = P->hook.inode_init_security(inode, dir, qstr,
 						  &lsm_xattr->name,
 						  &lsm_xattr->value,
-						  &lsm_xattr->value_len);
+						  &lsm_xattr->value_len,
+						  new_xattrs);
 		if (ret && ret != -EOPNOTSUPP)
 			goto out;
 
@@ -1112,7 +1113,7 @@ int security_old_inode_init_security(struct inode *inode, struct inode *dir,
 	hlist_for_each_entry(P, &security_hook_heads.inode_init_security,
 			     list) {
 		ret = P->hook.inode_init_security(inode, dir, qstr,
-						  name, value, len);
+						  name, value, len, NULL);
 		if (ret && ret != -EOPNOTSUPP)
 			return ret;
 

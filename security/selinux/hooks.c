@@ -2917,7 +2917,8 @@ static int selinux_dentry_create_files_as(struct dentry *dentry, int mode,
 static int selinux_inode_init_security(struct inode *inode, struct inode *dir,
 				       const struct qstr *qstr,
 				       const char **name,
-				       void **value, size_t *len)
+				       void **value, size_t *len,
+				       struct xattr *lsm_xattrs)
 {
 	const struct task_security_struct *tsec = selinux_cred(current_cred());
 	struct superblock_security_struct *sbsec;
