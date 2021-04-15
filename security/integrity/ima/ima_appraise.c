@@ -584,8 +584,10 @@ static void ima_reset_appraise_flags(struct inode *inode, int digsig)
 		clear_bit(IMA_DIGSIG, &iint->atomic_flags);
 }
 
-int ima_inode_setxattr(struct dentry *dentry, const char *xattr_name,
-		       const void *xattr_value, size_t xattr_value_len)
+int ima_inode_setxattr(struct user_namespace *mnt_userns,
+		       struct dentry *dentry, const char *xattr_name,
+		       const void *xattr_value, size_t xattr_value_len,
+		       int flags)
 {
 	const struct evm_ima_xattr_data *xvalue = xattr_value;
 	int result;
