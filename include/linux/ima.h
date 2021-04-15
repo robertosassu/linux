@@ -194,8 +194,10 @@ static inline void ima_post_key_create_or_update(struct key *keyring,
 extern bool is_ima_appraise_enabled(void);
 extern void ima_inode_post_setattr(struct user_namespace *mnt_userns,
 				   struct dentry *dentry, int ia_valid);
-extern int ima_inode_setxattr(struct dentry *dentry, const char *xattr_name,
-		       const void *xattr_value, size_t xattr_value_len);
+extern int ima_inode_setxattr(struct user_namespace *mnt_userns,
+			      struct dentry *dentry, const char *xattr_name,
+			      const void *xattr_value, size_t xattr_value_len,
+			      int flags);
 extern int ima_inode_set_acl(struct user_namespace *mnt_userns,
 			     struct dentry *dentry, const char *acl_name,
 			     struct posix_acl *kacl);
@@ -218,10 +220,12 @@ static inline void ima_inode_post_setattr(struct user_namespace *mnt_userns,
 	return;
 }
 
-static inline int ima_inode_setxattr(struct dentry *dentry,
+static inline int ima_inode_setxattr(struct user_namespace *mnt_userns,
+				     struct dentry *dentry,
 				     const char *xattr_name,
 				     const void *xattr_value,
-				     size_t xattr_value_len)
+				     size_t xattr_value_len,
+				     int flags)
 {
 	return 0;
 }
