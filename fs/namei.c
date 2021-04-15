@@ -3965,7 +3965,8 @@ retry:
 			error = vfs_create(mnt_userns, path.dentry->d_inode,
 					   dentry, mode, true);
 			if (!error)
-				ima_post_path_mknod(mnt_userns, dentry);
+				ima_post_path_mknod(mnt_userns, &path, dentry,
+						    mode, dev);
 			break;
 		case S_IFCHR: case S_IFBLK:
 			error = vfs_mknod(mnt_userns, path.dentry->d_inode,
