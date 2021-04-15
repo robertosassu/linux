@@ -684,6 +684,7 @@ int evm_inode_setattr(struct dentry *dentry, struct iattr *attr)
 
 /**
  * evm_inode_post_setattr - update 'security.evm' after modifying metadata
+ * @mnt_userns: user namespace of the idmapped mount
  * @dentry: pointer to the affected dentry
  * @ia_valid: for the UID and GID status
  *
@@ -693,7 +694,8 @@ int evm_inode_setattr(struct dentry *dentry, struct iattr *attr)
  * This function is called from notify_change(), which expects the caller
  * to lock the inode's i_mutex.
  */
-void evm_inode_post_setattr(struct dentry *dentry, int ia_valid)
+void evm_inode_post_setattr(struct user_namespace *mnt_userns,
+			    struct dentry *dentry, int ia_valid)
 {
 	if (!evm_status_revalidate(NULL))
 		return;
