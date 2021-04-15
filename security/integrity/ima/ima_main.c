@@ -413,7 +413,9 @@ int ima_file_mmap(struct file *file, unsigned long prot)
 
 /**
  * ima_file_mprotect - based on policy, limit mprotect change
- * @prot: contains the protection that will be applied by the kernel.
+ * @vma contains the memory region to modify
+ * @reqprot contains the protection requested by the application
+ * @prot: contains the protection that will be applied by the kernel
  *
  * Files can be mmap'ed read/write and later changed to execute to circumvent
  * IMA's mmap appraisal policy rules.  Due to locking issues (mmap semaphore
@@ -423,7 +425,8 @@ int ima_file_mmap(struct file *file, unsigned long prot)
  *
  * On mprotect change success, return 0.  On failure, return -EACESS.
  */
-int ima_file_mprotect(struct vm_area_struct *vma, unsigned long prot)
+int ima_file_mprotect(struct vm_area_struct *vma, unsigned long reqprot,
+		      unsigned long prot)
 {
 	struct ima_template_desc *template = NULL;
 	struct file *file = vma->vm_file;
