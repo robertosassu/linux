@@ -1461,7 +1461,7 @@ int security_inode_setxattr(struct user_namespace *mnt_userns,
 		ret = cap_inode_setxattr(dentry, name, value, size, flags);
 	if (ret)
 		return ret;
-	ret = ima_inode_setxattr(dentry, name, value, size);
+	ret = ima_inode_setxattr(mnt_userns, dentry, name, value, size, flags);
 	if (ret)
 		return ret;
 	return evm_inode_setxattr(mnt_userns, dentry, name, value, size);
