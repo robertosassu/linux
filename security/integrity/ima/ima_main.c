@@ -692,17 +692,25 @@ void ima_post_create_tmpfile(struct user_namespace *mnt_userns,
 /**
  * ima_post_path_mknod - mark as a new inode
  * @mnt_userns: user namespace of the mount the inode was found from
+ * @dir: path structure of parent of the new file
  * @dentry: newly created dentry
+ * @mode: mode of the new file
+ * @dev: undecoded device number
  *
  * Mark files created via the mknodat syscall as new, so that the
  * file data can be written later.
  */
 void ima_post_path_mknod(struct user_namespace *mnt_userns,
-			 struct dentry *dentry)
+			 const struct path *dir, struct dentry *dentry,
+			 umode_t mode, unsigned int dev)
 {
 	struct integrity_iint_cache *iint;
 	struct inode *inode = dentry->d_inode;
 	int must_appraise;
+
+	/* See do_mknodat(), IMA is executed for case 0: and case S_IFREG: */
+	if ((mode & S_IFMT) != 0 && (mode & S_IFMT) != S_IFREG)
+		return;
 
 	if (!ima_policy_flag || !S_ISREG(inode->i_mode))
 		return;
