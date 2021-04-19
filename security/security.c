@@ -70,6 +70,8 @@ const char *const lockdown_reasons[LOCKDOWN_CONFIDENTIALITY_MAX+1] = {
 };
 
 struct security_hook_heads security_hook_heads __lsm_ro_after_init;
+static int inode_init_security_hooks __lsm_ro_after_init =
+							MAX_LSM_EVM_XATTR - 1;
 static BLOCKING_NOTIFIER_HEAD(blocking_lsm_notifier_chain);
 
 static struct kmem_cache *lsm_file_cache;
@@ -1037,18 +1039,16 @@ int security_inode_init_security(struct inode *inode, struct inode *dir,
 
 	if (!initxattrs)
 		return call_int_hook(inode_init_security, -EOPNOTSUPP, inode,
-				     dir, qstr, NULL, NULL, NULL);
+				     dir, qstr, NULL, 0, fs_data);
 	memset(new_xattrs, 0, sizeof(new_xattrs));
 	lsm_xattr = new_xattrs;
 	ret = call_int_hook(inode_init_security, -EOPNOTSUPP, inode, dir, qstr,
-						&lsm_xattr->name,
-						&lsm_xattr->value,
-						&lsm_xattr->value_len);
+			    lsm_xattr, inode_init_security_hooks - 1, fs_data);
 	if (ret)
 		goto out;
 
 	evm_xattr = lsm_xattr + 1;
-	ret = evm_inode_init_security(inode, lsm_xattr, evm_xattr);
+	ret = evm_inode_init_security(inode, new_xattrs, evm_xattr);
 	if (ret)
 		goto out;
 	ret = initxattrs(inode, new_xattrs, fs_data);
@@ -1071,10 +1071,13 @@ int security_old_inode_init_security(struct inode *inode, struct inode *dir,
 				     const struct qstr *qstr, const char **name,
 				     void **value, size_t *len)
 {
+	struct xattr xattr = { .name = NULL, .value = NULL, .value_len = 0 };
+	struct xattr *lsm_xattr = (name && value && len) ? &xattr : NULL;
+
 	if (unlikely(IS_PRIVATE(inode)))
 		return -EOPNOTSUPP;
 	return call_int_hook(inode_init_security, -EOPNOTSUPP, inode, dir,
-			     qstr, name, value, len);
+			     qstr, lsm_xattr, 1, NULL);
 }
 EXPORT_SYMBOL(security_old_inode_init_security);
 
