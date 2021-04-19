@@ -30,8 +30,6 @@
 #include <linux/msg.h>
 #include <net/flow.h>
 
-#define MAX_LSM_EVM_XATTR	2
-
 /* How many LSMs were built into the kernel? */
 #define LSM_COUNT (__end_lsm_info - __start_lsm_info)
 
@@ -1028,9 +1026,10 @@ int security_inode_init_security(struct inode *inode, struct inode *dir,
 				 const struct qstr *qstr,
 				 const initxattrs initxattrs, void *fs_data)
 {
-	struct xattr new_xattrs[MAX_LSM_EVM_XATTR + 1];
+	struct xattr *new_xattrs;
 	struct xattr *lsm_xattr, *evm_xattr, *xattr;
-	int ret;
+	struct security_hook_list *P;
+	int ret, max_new_xattrs = 0;
 
 	if (unlikely(IS_PRIVATE(inode)))
 		return 0;
@@ -1038,12 +1037,46 @@ int security_inode_init_security(struct inode *inode, struct inode *dir,
 	if (!initxattrs)
 		return call_int_hook(inode_init_security, -EOPNOTSUPP, inode,
 				     dir, qstr, NULL, fs_data);
-	memset(new_xattrs, 0, sizeof(new_xattrs));
-	lsm_xattr = new_xattrs;
-	ret = call_int_hook(inode_init_security, -EOPNOTSUPP, inode, dir, qstr,
-			    &lsm_xattr, fs_data);
-	if (ret)
+
+	/* Determine at run-time the max number of xattr structs to allocate. */
+	hlist_for_each_entry(P, &security_hook_heads.inode_init_security, list)
+		max_new_xattrs++;
+
+	if (!max_new_xattrs)
+		return 0;
+
+	/* Allocate +1 for EVM and +1 as terminator. */
+	new_xattrs = kcalloc(max_new_xattrs + 2, sizeof(*new_xattrs), GFP_NOFS);
+	if (!new_xattrs)
+		return -ENOMEM;
+
+	hlist_for_each_entry(P, &security_hook_heads.inode_init_security,
+			     list) {
+		lsm_xattr = new_xattrs;
+
+		ret = P->hook.inode_init_security(inode, dir, qstr,
+						  &lsm_xattr, fs_data);
+		if (ret && ret != -EOPNOTSUPP)
+			goto out;
+
+		/* LSM implementation error. */
+		if (!ret &&
+		    (lsm_xattr->name == NULL || lsm_xattr->value == NULL)) {
+			WARN_ONCE(
+				"LSM %s: ret = 0 but xattr name/value = NULL\n",
+				P->lsm);
+			ret = -ENOENT;
+			goto out;
+		}
+
+		if (!--max_new_xattrs)
+			break;
+	}
+
+	if (!new_xattrs->name) {
+		ret = -EOPNOTSUPP;
 		goto out;
+	}
 
 	evm_xattr = lsm_xattr + 1;
 	ret = evm_inode_init_security(inode, new_xattrs, evm_xattr);
@@ -1053,6 +1086,7 @@ int security_inode_init_security(struct inode *inode, struct inode *dir,
 out:
 	for (xattr = new_xattrs; xattr->value != NULL; xattr++)
 		kfree(xattr->value);
+	kfree(new_xattrs);
 	return (ret == -EOPNOTSUPP) ? 0 : ret;
 }
 EXPORT_SYMBOL(security_inode_init_security);
@@ -1070,12 +1104,45 @@ int security_old_inode_init_security(struct inode *inode, struct inode *dir,
 				     void **value, size_t *len)
 {
 	struct xattr xattr = { .name = NULL, .value = NULL, .value_len = 0 };
-	struct xattr *lsm_xattr = &xattr;
+	struct xattr *lsm_xattr = (name && value && len) ? &xattr : NULL;
+	struct security_hook_list *P;
+	int ret;
 
 	if (unlikely(IS_PRIVATE(inode)))
 		return -EOPNOTSUPP;
-	return call_int_hook(inode_init_security, -EOPNOTSUPP, inode, dir,
-			     qstr, &lsm_xattr, NULL);
+
+	hlist_for_each_entry(P, &security_hook_heads.inode_init_security,
+			     list) {
+		ret = P->hook.inode_init_security(inode, dir, qstr,
+						  &lsm_xattr, NULL);
+		if (ret && ret != -EOPNOTSUPP)
+			return ret;
+
+		/* LSM implementation error. */
+		if (!ret &&
+		    ((name && xattr.name == NULL) ||
+		     (value && xattr.value == NULL))) {
+			WARN_ONCE(
+				"LSM %s: ret = 0 but xattr name/value = NULL\n",
+				P->lsm);
+
+			/* Callers should do the cleanup. */
+			return -ENOENT;
+		}
+
+		if (!ret) {
+			if (name)
+				*name = xattr.name;
+			if (value)
+				*value = xattr.value;
+			if (len)
+				*len = xattr.value_len;
+
+			return ret;
+		}
+	}
+
+	return -EOPNOTSUPP;
 }
 EXPORT_SYMBOL(security_old_inode_init_security);
 
