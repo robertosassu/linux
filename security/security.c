@@ -1037,18 +1037,16 @@ int security_inode_init_security(struct inode *inode, struct inode *dir,
 
 	if (!initxattrs)
 		return call_int_hook(inode_init_security, -EOPNOTSUPP, inode,
-				     dir, qstr, NULL, NULL, NULL);
+				     dir, qstr, NULL, fs_data);
 	memset(new_xattrs, 0, sizeof(new_xattrs));
 	lsm_xattr = new_xattrs;
 	ret = call_int_hook(inode_init_security, -EOPNOTSUPP, inode, dir, qstr,
-						&lsm_xattr->name,
-						&lsm_xattr->value,
-						&lsm_xattr->value_len);
+			    &lsm_xattr, fs_data);
 	if (ret)
 		goto out;
 
 	evm_xattr = lsm_xattr + 1;
-	ret = evm_inode_init_security(inode, lsm_xattr, evm_xattr);
+	ret = evm_inode_init_security(inode, new_xattrs, evm_xattr);
 	if (ret)
 		goto out;
 	ret = initxattrs(inode, new_xattrs, fs_data);
@@ -1071,10 +1069,13 @@ int security_old_inode_init_security(struct inode *inode, struct inode *dir,
 				     const struct qstr *qstr, const char **name,
 				     void **value, size_t *len)
 {
+	struct xattr xattr = { .name = NULL, .value = NULL, .value_len = 0 };
+	struct xattr *lsm_xattr = &xattr;
+
 	if (unlikely(IS_PRIVATE(inode)))
 		return -EOPNOTSUPP;
 	return call_int_hook(inode_init_security, -EOPNOTSUPP, inode, dir,
-			     qstr, name, value, len);
+			     qstr, &lsm_xattr, NULL);
 }
 EXPORT_SYMBOL(security_old_inode_init_security);
 

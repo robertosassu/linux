@@ -27,6 +27,7 @@
 
 #include <linux/security.h>
 #include <linux/init.h>
+#include <linux/xattr.h>
 #include <linux/rculist.h>
 
 /**
@@ -227,9 +228,11 @@
  *	@inode contains the inode structure of the newly created inode.
  *	@dir contains the inode structure of the parent directory.
  *	@qstr contains the last path component of the new object
- *	@name will be set to the allocated name suffix (e.g. selinux).
- *	@value will be set to the allocated attribute value.
- *	@len will be set to the length of the value.
+ *	@xattrs contains the full array of xattrs allocated by LSMs where
+ *	->name will be set to the allocated name suffix (e.g. selinux).
+ *	->value will be set to the allocated attribute value.
+ *	->len will be set to the length of the value.
+ *	@fs_data contains filesystem-specific data.
  *	Returns 0 if @name and @value have been successfully set,
  *	-EOPNOTSUPP if no security attribute is needed, or
  *	-ENOMEM on memory allocation failure.
@@ -1661,4 +1664,12 @@ static inline void security_delete_hooks(struct security_hook_list *hooks,
 
 extern int lsm_inode_alloc(struct inode *inode);
 
+static inline struct xattr *lsm_find_xattr_slot(struct xattr *xattrs)
+{
+	struct xattr *slot;
+
+	for (slot = xattrs; slot && slot->name != NULL; slot++);
+
+	return slot;
+}
 #endif /* ! __LINUX_LSM_HOOKS_H */
