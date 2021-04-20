@@ -261,7 +261,7 @@ out:
 	return evm_status;
 }
 
-static int evm_protected_xattr(const char *req_xattr_name)
+int evm_protected_xattr(const char *req_xattr_name)
 {
 	int namelen;
 	int found = 0;
@@ -712,14 +712,21 @@ int evm_inode_init_security(struct inode *inode, struct inode *dir,
 			    struct xattr **xattrs, void *fs_data)
 {
 	struct evm_xattr *xattr_data;
+	struct xattr *xattr;
 	struct xattr *new_xattr = lsm_find_xattr_slot(*xattrs);
-	int rc;
+	int rc, evm_protected_xattrs = 0;
 
 	if (!xattrs || !(*xattrs)->name)
 		return 0;
 
-	if (!(evm_initialized & EVM_INIT_HMAC) ||
-	    !evm_protected_xattr((*xattrs)->name))
+	if (!(evm_initialized & EVM_INIT_HMAC))
+		return -EOPNOTSUPP;
+
+	for (xattr = *xattrs; xattr->name != NULL; xattr++)
+		if (evm_protected_xattr(xattr->name))
+			evm_protected_xattrs++;
+
+	if (!evm_protected_xattrs)
 		return -EOPNOTSUPP;
 
 	xattr_data = kzalloc(sizeof(*xattr_data), GFP_NOFS);
