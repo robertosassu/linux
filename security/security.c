@@ -1027,7 +1027,7 @@ int security_inode_init_security(struct inode *inode, struct inode *dir,
 				 const initxattrs initxattrs, void *fs_data)
 {
 	struct xattr *new_xattrs;
-	struct xattr *lsm_xattr, *evm_xattr, *xattr;
+	struct xattr *lsm_xattr, *xattr;
 	struct security_hook_list *P;
 	int ret, max_new_xattrs = 0;
 
@@ -1082,9 +1082,8 @@ int security_inode_init_security(struct inode *inode, struct inode *dir,
 		goto out;
 	}
 
-	evm_xattr = lsm_xattr;
-	ret = evm_inode_init_security(inode, new_xattrs, evm_xattr);
-	if (ret)
+	ret = evm_inode_init_security(inode, dir, qstr, new_xattrs, fs_data);
+	if (ret && ret != -EOPNOTSUPP)
 		goto out;
 	ret = initxattrs(inode, new_xattrs, fs_data);
 out:
