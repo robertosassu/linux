@@ -1436,12 +1436,13 @@ static int smack_inode_getsecurity(struct user_namespace *mnt_userns,
 	struct inode *ip = (struct inode *)inode;
 	struct smack_known *isp;
 
-	if (strcmp(name, XATTR_SMACK_SUFFIX) == 0)
+	if (strcmp(name, XATTR_SMACK_SUFFIX) == 0) {
 		isp = smk_of_inode(inode);
-	else {
-		/*
-		 * The rest of the Smack xattrs are only on sockets.
-		 */
+	} else if (strcmp(name, XATTR_SMACK_IPIN) == 0 ||
+		   strcmp(name, XATTR_SMACK_IPOUT) == 0 ||
+		   strcmp(name, XATTR_SMACK_EXEC) == 0 ||
+		   strcmp(name, XATTR_SMACK_TRANSMUTE) == 0 ||
+		   strcmp(name, XATTR_SMACK_MMAP) == 0) {
 		sbp = ip->i_sb;
 		if (sbp->s_magic != SOCKFS_MAGIC)
 			return -EOPNOTSUPP;
@@ -1458,6 +1459,8 @@ static int smack_inode_getsecurity(struct user_namespace *mnt_userns,
 			isp = ssp->smk_out;
 		else
 			return -EOPNOTSUPP;
+	} else {
+		return -EOPNOTSUPP;
 	}
 
 	if (alloc) {
