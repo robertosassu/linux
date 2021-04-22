@@ -776,7 +776,8 @@ int ima_inode_setxattr(struct user_namespace *mnt_userns,
 	return result;
 }
 
-int ima_inode_removexattr(struct dentry *dentry, const char *xattr_name)
+int ima_inode_removexattr(struct user_namespace *mnt_userns,
+			  struct dentry *dentry, const char *xattr_name)
 {
 	int result;
 
