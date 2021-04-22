@@ -185,7 +185,8 @@ extern void ima_inode_post_setxattr(struct dentry *dentry,
 				    const void *xattr_value,
 				    size_t xattr_value_len,
 				    int flags);
-extern int ima_inode_removexattr(struct dentry *dentry, const char *xattr_name);
+extern int ima_inode_removexattr(struct user_namespace *mnt_userns,
+				 struct dentry *dentry, const char *xattr_name);
 extern void ima_inode_post_removexattr(struct dentry *dentry,
 				       const char *xattr_name);
 #else
@@ -218,7 +219,8 @@ static inline void ima_inode_post_setxattr(struct dentry *dentry,
 {
 }
 
-static inline int ima_inode_removexattr(struct dentry *dentry,
+static inline int ima_inode_removexattr(struct user_namespace *mnt_userns,
+					struct dentry *dentry,
 					const char *xattr_name)
 {
 	return 0;

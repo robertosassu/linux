@@ -620,7 +620,8 @@ void ima_inode_post_setxattr(struct dentry *dentry, const char *xattr_name,
 		ima_reset_appraise_flags(d_backing_inode(dentry), digsig);
 }
 
-int ima_inode_removexattr(struct dentry *dentry, const char *xattr_name)
+int ima_inode_removexattr(struct user_namespace *mnt_userns,
+			  struct dentry *dentry, const char *xattr_name)
 {
 	int result;
 
