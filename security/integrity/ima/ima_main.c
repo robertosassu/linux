@@ -1118,7 +1118,14 @@ static struct security_hook_list ima_hooks[] __lsm_ro_after_init = {
 
 int __init init_ima_lsm(void)
 {
+	int ret;
+
 	security_add_hooks(ima_hooks, ARRAY_SIZE(ima_hooks), "integrity");
+
+	ret = init_ima_appraise_lsm();
+	if (ret)
+		return ret;
+
 	ima_enabled = 1;
 	return 0;
 }
