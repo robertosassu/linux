@@ -549,6 +549,31 @@ static int __ima_inode_hash(struct inode *inode, char *buf, size_t buf_size)
 	return hash_algo;
 }
 
+int ima_inode_getsecurity(struct user_namespace *mnt_userns,
+			  struct inode *inode, const char *name, void **buffer,
+			  bool alloc)
+{
+	u8 temp_buf[IMA_MAX_DIGEST_SIZE];
+	int hash_algo;
+
+	if (strcmp(name, XATTR_IMA_SUFFIX))
+		return -EOPNOTSUPP;
+
+	hash_algo = __ima_inode_hash(inode, temp_buf, sizeof(temp_buf));
+	if (hash_algo < 0)
+		return hash_algo;
+
+	if (alloc) {
+		*buffer = kmalloc(hash_digest_size[hash_algo], GFP_KERNEL);
+		if (*buffer == NULL)
+			return -ENOMEM;
+
+		memcpy(*buffer, temp_buf, hash_digest_size[hash_algo]);
+	}
+
+	return 0;
+}
+
 /**
  * ima_file_hash - return the stored measurement if a file has been hashed and
  * is in the iint cache.
