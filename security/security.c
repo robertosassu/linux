@@ -1548,7 +1548,7 @@ int security_inode_removexattr(struct user_namespace *mnt_userns,
 		ret = cap_inode_removexattr(mnt_userns, dentry, name);
 	if (ret)
 		return ret;
-	ret = ima_inode_removexattr(dentry, name);
+	ret = ima_inode_removexattr(mnt_userns, dentry, name);
 	if (ret)
 		return ret;
 	return evm_inode_removexattr(mnt_userns, dentry, name);
