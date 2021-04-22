@@ -1398,7 +1398,7 @@ void security_inode_post_setxattr(struct dentry *dentry, const char *name,
 		return;
 	call_void_hook(inode_post_setxattr, dentry, name, value, size, flags);
 	ima_inode_post_setxattr(dentry, name, value, size, flags);
-	evm_inode_post_setxattr(dentry, name, value, size);
+	evm_inode_post_setxattr(dentry, name, value, size, flags);
 }
 
 int security_inode_getxattr(struct dentry *dentry, const char *name)
