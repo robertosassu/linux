@@ -30,8 +30,6 @@
 #include <linux/msg.h>
 #include <net/flow.h>
 
-#define MAX_LSM_EVM_XATTR	2
-
 /* How many LSMs were built into the kernel? */
 #define LSM_COUNT (__end_lsm_info - __start_lsm_info)
 
@@ -70,8 +68,7 @@ const char *const lockdown_reasons[LOCKDOWN_CONFIDENTIALITY_MAX+1] = {
 };
 
 struct security_hook_heads security_hook_heads __lsm_ro_after_init;
-static int inode_init_security_hooks __lsm_ro_after_init =
-							MAX_LSM_EVM_XATTR - 1;
+int inode_init_security_hooks __lsm_ro_after_init;
 static BLOCKING_NOTIFIER_HEAD(blocking_lsm_notifier_chain);
 
 static struct kmem_cache *lsm_file_cache;
@@ -484,6 +481,8 @@ void __init security_add_hooks(struct security_hook_list *hooks, int count,
 	for (i = 0; i < count; i++) {
 		hooks[i].lsm = lsm;
 		hlist_add_tail_rcu(&hooks[i].list, hooks[i].head);
+		if (hooks[i].head == &security_hook_heads.inode_init_security)
+			inode_init_security_hooks++;
 	}
 
 	/*
@@ -1030,8 +1029,9 @@ int security_inode_init_security(struct inode *inode, struct inode *dir,
 				 const struct qstr *qstr,
 				 const initxattrs initxattrs, void *fs_data)
 {
-	struct xattr new_xattrs[MAX_LSM_EVM_XATTR + 1];
-	struct xattr *lsm_xattr, *evm_xattr, *xattr;
+	struct xattr *new_xattrs;
+	struct xattr *lsm_xattr, *xattr;
+	struct security_hook_list *P;
 	int ret;
 
 	if (unlikely(IS_PRIVATE(inode)))
@@ -1040,21 +1040,54 @@ int security_inode_init_security(struct inode *inode, struct inode *dir,
 	if (!initxattrs)
 		return call_int_hook(inode_init_security, -EOPNOTSUPP, inode,
 				     dir, qstr, NULL, 0, fs_data);
-	memset(new_xattrs, 0, sizeof(new_xattrs));
-	lsm_xattr = new_xattrs;
-	ret = call_int_hook(inode_init_security, -EOPNOTSUPP, inode, dir, qstr,
-			    lsm_xattr, inode_init_security_hooks - 1, fs_data);
-	if (ret)
-		goto out;
 
-	evm_xattr = lsm_xattr + 1;
-	ret = evm_inode_init_security(inode, new_xattrs, evm_xattr);
+	if (!inode_init_security_hooks)
+		return 0;
+
+	/* Allocate +1 for EVM and +1 as terminator. */
+	new_xattrs = kcalloc(inode_init_security_hooks + 2, sizeof(*new_xattrs),
+			     GFP_NOFS);
+	if (!new_xattrs)
+		return -ENOMEM;
+
+	lsm_xattr = new_xattrs;
+	hlist_for_each_entry(P, &security_hook_heads.inode_init_security,
+			     list) {
+		ret = P->hook.inode_init_security(inode, dir, qstr, new_xattrs,
+						  inode_init_security_hooks,
+						  fs_data);
+		if (ret) {
+			if (ret != -EOPNOTSUPP)
+				goto out;
+
+			continue;
+		}
+
+		/* LSM implementation error. */
+		if (lsm_xattr->name == NULL || lsm_xattr->value == NULL) {
+			WARN_ONCE(
+				"LSM %s: ret = 0 but xattr name/value = NULL\n",
+				P->lsm);
+			ret = -ENOENT;
+			goto out;
+		}
+
+		lsm_xattr++;
+	}
+
+	if (!new_xattrs->name) {
+		ret = -EOPNOTSUPP;
+		goto out;
+	}
+
+	ret = evm_inode_init_security(inode, new_xattrs, lsm_xattr);
 	if (ret)
 		goto out;
 	ret = initxattrs(inode, new_xattrs, fs_data);
 out:
 	for (xattr = new_xattrs; xattr->value != NULL; xattr++)
 		kfree(xattr->value);
+	kfree(new_xattrs);
 	return (ret == -EOPNOTSUPP) ? 0 : ret;
 }
 EXPORT_SYMBOL(security_inode_init_security);
@@ -1073,11 +1106,44 @@ int security_old_inode_init_security(struct inode *inode, struct inode *dir,
 {
 	struct xattr xattr = { .name = NULL, .value = NULL, .value_len = 0 };
 	struct xattr *lsm_xattr = (name && value && len) ? &xattr : NULL;
+	struct security_hook_list *P;
+	int ret;
 
 	if (unlikely(IS_PRIVATE(inode)))
 		return -EOPNOTSUPP;
-	return call_int_hook(inode_init_security, -EOPNOTSUPP, inode, dir,
-			     qstr, lsm_xattr, 1, NULL);
+
+	hlist_for_each_entry(P, &security_hook_heads.inode_init_security,
+			     list) {
+		ret = P->hook.inode_init_security(inode, dir, qstr, lsm_xattr,
+						  1, NULL);
+		if (ret) {
+			if (ret != -EOPNOTSUPP)
+				return ret;
+
+			continue;
+		}
+
+		if (!lsm_xattr)
+			continue;
+
+		/* LSM implementation error. */
+		if (lsm_xattr->name == NULL || lsm_xattr->value == NULL) {
+			WARN_ONCE(
+				"LSM %s: ret = 0 but xattr name/value = NULL\n",
+				P->lsm);
+
+			/* Callers should do the cleanup. */
+			return -ENOENT;
+		}
+
+		*name = lsm_xattr->name;
+		*value = lsm_xattr->value;
+		*len = lsm_xattr->value_len;
+
+		return ret;
+	}
+
+	return -EOPNOTSUPP;
 }
 EXPORT_SYMBOL(security_old_inode_init_security);
 
