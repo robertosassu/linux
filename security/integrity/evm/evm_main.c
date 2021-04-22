@@ -509,7 +509,7 @@ out:
  */
 int evm_inode_setxattr(struct user_namespace *mnt_userns, struct dentry *dentry,
 		       const char *xattr_name, const void *xattr_value,
-		       size_t xattr_value_len)
+		       size_t xattr_value_len, int flags)
 {
 	const struct evm_ima_xattr_data *xattr_data = xattr_value;
 
