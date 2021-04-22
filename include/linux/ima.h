@@ -207,7 +207,8 @@ static inline int ima_inode_remove_acl(struct user_namespace *mnt_userns,
 {
 	return ima_inode_set_acl(mnt_userns, dentry, acl_name, NULL);
 }
-extern int ima_inode_removexattr(struct dentry *dentry, const char *xattr_name);
+extern int ima_inode_removexattr(struct user_namespace *mnt_userns,
+				 struct dentry *dentry, const char *xattr_name);
 #else
 static inline bool is_ima_appraise_enabled(void)
 {
@@ -238,7 +239,8 @@ static inline int ima_inode_set_acl(struct user_namespace *mnt_userns,
 	return 0;
 }
 
-static inline int ima_inode_removexattr(struct dentry *dentry,
+static inline int ima_inode_removexattr(struct user_namespace *mnt_userns,
+					struct dentry *dentry,
 					const char *xattr_name)
 {
 	return 0;

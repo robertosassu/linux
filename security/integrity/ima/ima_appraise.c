@@ -788,7 +788,8 @@ int ima_inode_set_acl(struct user_namespace *mnt_userns, struct dentry *dentry,
 	return 0;
 }
 
-int ima_inode_removexattr(struct dentry *dentry, const char *xattr_name)
+int ima_inode_removexattr(struct user_namespace *mnt_userns,
+			  struct dentry *dentry, const char *xattr_name)
 {
 	int result;
 
