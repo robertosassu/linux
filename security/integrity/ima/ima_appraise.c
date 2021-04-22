@@ -13,6 +13,7 @@
 #include <linux/magic.h>
 #include <linux/ima.h>
 #include <linux/evm.h>
+#include <linux/lsm_hooks.h>
 #include <keys/system_keyring.h>
 
 #include "ima.h"
@@ -530,8 +531,8 @@ void ima_update_xattr(struct integrity_iint_cache *iint, struct file *file)
  * This function is called from notify_change(), which expects the caller
  * to lock the inode's i_mutex.
  */
-void ima_inode_post_setattr(struct user_namespace *mnt_userns,
-			    struct dentry *dentry, int ia_valid)
+static void ima_inode_post_setattr(struct user_namespace *mnt_userns,
+				   struct dentry *dentry, int ia_valid)
 {
 	struct inode *inode = d_backing_inode(dentry);
 	struct integrity_iint_cache *iint;
@@ -584,10 +585,10 @@ static void ima_reset_appraise_flags(struct inode *inode, int digsig)
 		clear_bit(IMA_DIGSIG, &iint->atomic_flags);
 }
 
-int ima_inode_setxattr(struct user_namespace *mnt_userns,
-		       struct dentry *dentry, const char *xattr_name,
-		       const void *xattr_value, size_t xattr_value_len,
-		       int flags)
+static int ima_inode_setxattr(struct user_namespace *mnt_userns,
+			      struct dentry *dentry, const char *xattr_name,
+			      const void *xattr_value, size_t xattr_value_len,
+			      int flags)
 {
 	const struct evm_ima_xattr_data *xvalue = xattr_value;
 	int result;
@@ -602,9 +603,11 @@ int ima_inode_setxattr(struct user_namespace *mnt_userns,
 	return result;
 }
 
-void ima_inode_post_setxattr(struct dentry *dentry, const char *xattr_name,
-			     const void *xattr_value, size_t xattr_value_len,
-			     int flags)
+static void ima_inode_post_setxattr(struct dentry *dentry,
+				    const char *xattr_name,
+				    const void *xattr_value,
+				    size_t xattr_value_len,
+				    int flags)
 {
 	const struct evm_ima_xattr_data *xvalue = xattr_value;
 	int digsig = 0;
@@ -620,8 +623,8 @@ void ima_inode_post_setxattr(struct dentry *dentry, const char *xattr_name,
 		ima_reset_appraise_flags(d_backing_inode(dentry), digsig);
 }
 
-int ima_inode_removexattr(struct user_namespace *mnt_userns,
-			  struct dentry *dentry, const char *xattr_name)
+static int ima_inode_removexattr(struct user_namespace *mnt_userns,
+				 struct dentry *dentry, const char *xattr_name)
 {
 	int result;
 
@@ -632,11 +635,27 @@ int ima_inode_removexattr(struct user_namespace *mnt_userns,
 	return result;
 }
 
-void ima_inode_post_removexattr(struct dentry *dentry, const char *xattr_name)
+static void ima_inode_post_removexattr(struct dentry *dentry,
+				       const char *xattr_name)
 {
 	int result;
 
 	result = ima_protect_xattr(dentry, xattr_name, NULL, 0);
 	if (result == 1 || evm_status_revalidate(xattr_name))
 		ima_reset_appraise_flags(d_backing_inode(dentry), 0);
+}
+
+static struct security_hook_list ima_appraise_hooks[] __lsm_ro_after_init = {
+	LSM_HOOK_INIT(inode_post_setattr, ima_inode_post_setattr),
+	LSM_HOOK_INIT(inode_setxattr, ima_inode_setxattr),
+	LSM_HOOK_INIT(inode_post_setxattr, ima_inode_post_setxattr),
+	LSM_HOOK_INIT(inode_removexattr, ima_inode_removexattr),
+	LSM_HOOK_INIT(inode_post_removexattr, ima_inode_post_removexattr),
+};
+
+int __init init_ima_appraise_lsm(void)
+{
+	security_add_hooks(ima_appraise_hooks, ARRAY_SIZE(ima_appraise_hooks),
+			   "integrity");
+	return 0;
 }

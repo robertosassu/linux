@@ -19,7 +19,6 @@
 #include <linux/kernel_read_file.h>
 #include <linux/lsm_hooks.h>
 #include <linux/integrity.h>
-#include <linux/ima.h>
 #include <linux/evm.h>
 #include <linux/fsnotify.h>
 #include <linux/mman.h>
@@ -1407,9 +1406,6 @@ int security_inode_setxattr(struct user_namespace *mnt_userns,
 		ret = cap_inode_setxattr(dentry, name, value, size, flags);
 	if (ret)
 		return ret;
-	ret = ima_inode_setxattr(mnt_userns, dentry, name, value, size, flags);
-	if (ret)
-		return ret;
 	return evm_inode_setxattr(mnt_userns, dentry, name, value, size, flags);
 }
 
@@ -1419,7 +1415,6 @@ void security_inode_post_setxattr(struct dentry *dentry, const char *name,
 	if (unlikely(IS_PRIVATE(d_backing_inode(dentry))))
 		return;
 	call_void_hook(inode_post_setxattr, dentry, name, value, size, flags);
-	ima_inode_post_setxattr(dentry, name, value, size, flags);
 	evm_inode_post_setxattr(dentry, name, value, size, flags);
 }
 
@@ -1451,9 +1446,6 @@ int security_inode_removexattr(struct user_namespace *mnt_userns,
 	ret = call_int_hook(inode_removexattr, 1, mnt_userns, dentry, name);
 	if (ret == 1)
 		ret = cap_inode_removexattr(mnt_userns, dentry, name);
-	if (ret)
-		return ret;
-	ret = ima_inode_removexattr(mnt_userns, dentry, name);
 	if (ret)
 		return ret;
 	return evm_inode_removexattr(mnt_userns, dentry, name);

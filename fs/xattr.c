@@ -16,7 +16,6 @@
 #include <linux/namei.h>
 #include <linux/security.h>
 #include <linux/evm.h>
-#include <linux/ima.h>
 #include <linux/syscalls.h>
 #include <linux/export.h>
 #include <linux/fsnotify.h>
@@ -504,7 +503,6 @@ __vfs_removexattr_locked(struct user_namespace *mnt_userns,
 	if (!error) {
 		fsnotify_xattr(dentry);
 		security_inode_post_removexattr(dentry, name);
-		ima_inode_post_removexattr(dentry, name);
 		evm_inode_post_removexattr(dentry, name);
 	}
 
