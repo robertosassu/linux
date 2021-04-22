@@ -27,7 +27,7 @@ extern void evm_inode_post_setattr(struct user_namespace *mnt_userns,
 				   struct dentry *dentry, int ia_valid);
 extern int evm_inode_setxattr(struct user_namespace *mnt_userns,
 			      struct dentry *dentry, const char *name,
-			      const void *value, size_t size);
+			      const void *value, size_t size, int flags);
 extern void evm_inode_post_setxattr(struct dentry *dentry,
 				    const char *xattr_name,
 				    const void *xattr_value,
@@ -105,7 +105,7 @@ static inline void evm_inode_post_setattr(struct user_namespace *mnt_userns,
 
 static inline int evm_inode_setxattr(struct user_namespace *mnt_userns,
 				     struct dentry *dentry, const char *name,
-				     const void *value, size_t size)
+				     const void *value, size_t size, int flags)
 {
 	return 0;
 }
