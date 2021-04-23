@@ -1159,10 +1159,28 @@ int security_old_inode_init_security(struct inode *inode, struct inode *dir,
 				     const struct qstr *qstr, const char **name,
 				     void **value, size_t *len)
 {
+	struct security_hook_list *hook_ptr;
+	bool new_xattrs_set = false;
+	int ret = -EOPNOTSUPP;
+
 	if (unlikely(IS_PRIVATE(inode)))
 		return -EOPNOTSUPP;
-	return call_int_hook(inode_init_security, -EOPNOTSUPP, inode, dir,
-			     qstr, name, value, len);
+
+	hlist_for_each_entry(hook_ptr, &security_hook_heads.inode_init_security,
+			     list) {
+		ret = hook_ptr->hook.inode_init_security(inode, dir, qstr, name,
+							 value, len);
+		if (ret == -EOPNOTSUPP)
+			continue;
+		if (ret != 0)
+			return ret;
+		if (WARN_ON_ONCE((name && !*name) || (value && !*value)))
+			return -ENOMEM;
+		new_xattrs_set = true;
+		break;
+	}
+
+	return new_xattrs_set ? 0 : -EOPNOTSUPP;
 }
 EXPORT_SYMBOL(security_old_inode_init_security);
 
