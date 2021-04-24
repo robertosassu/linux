@@ -1103,9 +1103,9 @@ int security_inode_init_security(struct inode *inode, struct inode *dir,
 		goto out;
 	}
 
-	ret = evm_inode_init_security(inode, new_xattrs,
-				      new_xattrs + base_slot);
-	if (ret)
+	ret = evm_inode_init_security(inode, dir, qstr, new_xattrs, &base_slot,
+				      fs_data);
+	if (ret && ret != -EOPNOTSUPP)
 		goto out;
 	ret = initxattrs(inode, new_xattrs, fs_data);
 out:
