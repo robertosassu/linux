@@ -52,7 +52,9 @@
 #define SMK_RECEIVING	1
 #define SMK_SENDING	2
 
+#define SMACK_INODE_INIT_XATTRS 1
 #ifdef SMACK_IPV6_PORT_LABELING
+
 static DEFINE_MUTEX(smack_ipv6_lock);
 static LIST_HEAD(smk_ipv6_port_list);
 #endif
@@ -955,7 +957,7 @@ static int smack_inode_init_security(struct inode *inode, struct inode *dir,
 	struct smack_known *isp = smk_of_inode(inode);
 	struct smack_known *dsp = smk_of_inode(dir);
 	struct xattr *xattr = lsm_find_xattr_slot(xattrs, base_slot,
-						  *base_slot + 1);
+			smack_blob_sizes.lbs_xattr + SMACK_INODE_INIT_XATTRS);
 	int may;
 
 	if (xattr) {
@@ -4787,6 +4789,7 @@ struct lsm_blob_sizes smack_blob_sizes __lsm_ro_after_init = {
 	.lbs_ipc = sizeof(struct smack_known *),
 	.lbs_msg_msg = sizeof(struct smack_known *),
 	.lbs_superblock = sizeof(struct superblock_smack),
+	.lbs_xattr = SMACK_INODE_INIT_XATTRS,
 };
 
 static struct security_hook_list smack_hooks[] __lsm_ro_after_init = {
