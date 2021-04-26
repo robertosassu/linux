@@ -104,6 +104,8 @@
 #include "audit.h"
 #include "avc_ss.h"
 
+#define SELINUX_INODE_INIT_XATTRS 1
+
 struct selinux_state selinux_state;
 
 /* SECMARK reference count */
@@ -2922,7 +2924,7 @@ static int selinux_inode_init_security(struct inode *inode, struct inode *dir,
 	const struct task_security_struct *tsec = selinux_cred(current_cred());
 	struct superblock_security_struct *sbsec;
 	struct xattr *xattr = lsm_find_xattr_slot(xattrs, base_slot,
-						  *base_slot + 1);
+		selinux_blob_sizes.lbs_xattr + SELINUX_INODE_INIT_XATTRS);
 	u32 newsid, clen;
 	int rc;
 	char *context;
@@ -6976,6 +6978,7 @@ struct lsm_blob_sizes selinux_blob_sizes __lsm_ro_after_init = {
 	.lbs_inode = sizeof(struct inode_security_struct),
 	.lbs_ipc = sizeof(struct ipc_security_struct),
 	.lbs_msg_msg = sizeof(struct msg_security_struct),
+	.lbs_xattr = SELINUX_INODE_INIT_XATTRS,
 };
 
 #ifdef CONFIG_PERF_EVENTS
