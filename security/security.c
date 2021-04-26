@@ -30,8 +30,6 @@
 #include <linux/msg.h>
 #include <net/flow.h>
 
-#define MAX_LSM_EVM_XATTR	2
-
 /* How many LSMs were built into the kernel? */
 #define LSM_COUNT (__end_lsm_info - __start_lsm_info)
 
@@ -204,6 +202,7 @@ static void __init lsm_set_blob_sizes(struct lsm_blob_sizes *needed)
 	lsm_set_blob_size(&needed->lbs_ipc, &blob_sizes.lbs_ipc);
 	lsm_set_blob_size(&needed->lbs_msg_msg, &blob_sizes.lbs_msg_msg);
 	lsm_set_blob_size(&needed->lbs_task, &blob_sizes.lbs_task);
+	lsm_set_blob_size(&needed->lbs_xattr, &blob_sizes.lbs_xattr);
 }
 
 /* Prepare LSM for initialization. */
@@ -339,6 +338,7 @@ static void __init ordered_lsm_init(void)
 	init_debug("ipc blob size      = %d\n", blob_sizes.lbs_ipc);
 	init_debug("msg_msg blob size  = %d\n", blob_sizes.lbs_msg_msg);
 	init_debug("task blob size     = %d\n", blob_sizes.lbs_task);
+	init_debug("xattr slots        = %d\n", blob_sizes.lbs_xattr);
 
 	/*
 	 * Create any kmem_caches needed for blobs
@@ -1042,9 +1042,9 @@ int security_inode_init_security(struct inode *inode, struct inode *dir,
 				 const struct qstr *qstr,
 				 const initxattrs initxattrs, void *fs_data)
 {
-	struct xattr new_xattrs[MAX_LSM_EVM_XATTR + 1];
-	struct xattr *xattr;
-	int ret, base_slot = 0;
+	struct xattr *new_xattrs, *xattr;
+	struct security_hook_list *P;
+	int ret, base_slot = 0, old_base_slot;
 
 	if (unlikely(IS_PRIVATE(inode)))
 		return 0;
@@ -1052,11 +1052,56 @@ int security_inode_init_security(struct inode *inode, struct inode *dir,
 	if (!initxattrs)
 		return call_int_hook(inode_init_security, -EOPNOTSUPP, inode,
 				     dir, qstr, NULL, &base_slot, fs_data);
-	memset(new_xattrs, 0, sizeof(new_xattrs));
-	ret = call_int_hook(inode_init_security, -EOPNOTSUPP, inode, dir, qstr,
-			    new_xattrs, &base_slot, fs_data);
-	if (ret)
+
+	/* Allocate +1 for EVM and +1 as terminator. */
+	new_xattrs = kcalloc(blob_sizes.lbs_xattr + 2, sizeof(*new_xattrs),
+			     GFP_NOFS);
+	if (!new_xattrs)
+		return -ENOMEM;
+
+	hlist_for_each_entry(P, &security_hook_heads.inode_init_security,
+			     list) {
+		old_base_slot = base_slot;
+		ret = P->hook.inode_init_security(inode, dir, qstr, new_xattrs,
+						  &base_slot, fs_data);
+		if (ret) {
+			if (ret != -EOPNOTSUPP)
+				goto out;
+
+			continue;
+		}
+
+		if (base_slot == old_base_slot) {
+			WARN_ONCE(
+			    "LSM %s: returned zero but didn't fill any slot\n",
+			    P->lsm);
+			ret = -EINVAL;
+			goto out;
+		}
+
+		if (base_slot > blob_sizes.lbs_xattr) {
+			WARN_ONCE(
+			    "LSM %s: wrote xattr outside array (%d/%d) \n",
+			    P->lsm, base_slot, blob_sizes.lbs_xattr);
+			ret = -EINVAL;
+			goto out;
+		}
+
+		while (old_base_slot < base_slot) {
+			if (new_xattrs[old_base_slot++].name != NULL)
+				continue;
+
+			WARN_ONCE("LSM %s: ret = 0 but xattr name = NULL\n",
+				  P->lsm);
+			ret = -EINVAL;
+			goto out;
+		}
+	}
+
+	if (!base_slot) {
+		ret = -EOPNOTSUPP;
 		goto out;
+	}
 
 	ret = evm_inode_init_security(inode, new_xattrs,
 				      new_xattrs + base_slot);
@@ -1070,6 +1115,7 @@ out:
 			continue;
 		kfree(xattr->value);
 	}
+	kfree(new_xattrs);
 	if (initxattrs == &security_initxattrs)
 		return ret;
 	return (ret == -EOPNOTSUPP) ? 0 : ret;
