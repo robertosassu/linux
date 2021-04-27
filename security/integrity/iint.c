@@ -174,6 +174,12 @@ static void init_once(void *foo)
 
 static int __init integrity_iintcache_init(void)
 {
+	int error;
+
+	error = init_ima_lsm();
+	if (error)
+		return error;
+
 	iint_cache =
 	    kmem_cache_create("iint_cache", sizeof(struct integrity_iint_cache),
 			      0, SLAB_PANIC, init_once);
