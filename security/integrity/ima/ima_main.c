@@ -210,6 +210,7 @@ static int process_measurement(struct file *file, const struct cred *cred,
 	int xattr_len = 0;
 	bool violation_check;
 	enum hash_algo hash_algo;
+	unsigned long xattr_reset_flags = IMA_DONE_MASK;
 
 	if (!ima_policy_flag || !S_ISREG(inode->i_mode))
 		return 0;
@@ -259,6 +260,13 @@ static int process_measurement(struct file *file, const struct cred *cred,
 				 IMA_ACTION_FLAGS);
 
 	/*
+	 * Avoid resetting IMA_COLLECTED when it is not necessary (on xattr
+	 * operations file content does not change).
+	 */
+	if (test_and_clear_bit(IMA_CHANGE_XATTR, &iint->atomic_flags))
+		xattr_reset_flags &= ~IMA_COLLECTED;
+
+	/*
 	 * Re-evaulate the file if either the xattr has changed or the
 	 * kernel has no way of detecting file change on the filesystem.
 	 * (Limited to privileged mounted filesystems.)
@@ -267,7 +275,7 @@ static int process_measurement(struct file *file, const struct cred *cred,
 	    ((inode->i_sb->s_iflags & SB_I_IMA_UNVERIFIABLE_SIGNATURE) &&
 	     !(inode->i_sb->s_iflags & SB_I_UNTRUSTED_MOUNTER) &&
 	     !(action & IMA_FAIL_UNVERIFIABLE_SIGS))) {
-		iint->flags &= ~IMA_DONE_MASK;
+		iint->flags &= ~xattr_reset_flags;
 		iint->measured_pcrs = 0;
 	}
 
