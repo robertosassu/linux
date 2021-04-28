@@ -143,7 +143,7 @@ struct integrity_iint_cache *integrity_inode_get(struct inode *inode)
  *
  * Free the integrity information(iint) associated with an inode.
  */
-void integrity_inode_free(struct inode *inode)
+static void integrity_inode_free(struct inode *inode)
 {
 	struct integrity_iint_cache *iint;
 
@@ -172,6 +172,11 @@ static void init_once(void *foo)
 	mutex_init(&iint->mutex);
 }
 
+static struct security_hook_list integrity_hooks[] __lsm_ro_after_init = {
+	LSM_HOOK_INIT(inode_free_security, integrity_inode_free),
+	LSM_HOOK_INIT(kernel_module_request, integrity_kernel_module_request),
+};
+
 static int __init integrity_iintcache_init(void)
 {
 	int error;
@@ -187,6 +192,9 @@ static int __init integrity_iintcache_init(void)
 	iint_cache =
 	    kmem_cache_create("iint_cache", sizeof(struct integrity_iint_cache),
 			      0, SLAB_PANIC, init_once);
+
+	security_add_hooks(integrity_hooks, ARRAY_SIZE(integrity_hooks),
+			   "integrity");
 	return 0;
 }
 
