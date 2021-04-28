@@ -18,6 +18,7 @@
 #include <linux/key.h>
 #include <linux/audit.h>
 #include <crypto/hash_info.h>
+#include <linux/lsm_hooks.h>
 
 /* iint action cache flags */
 #define IMA_MEASURE		0x00000001
@@ -147,6 +148,14 @@ struct integrity_iint_cache {
  */
 struct integrity_iint_cache *integrity_iint_find(struct inode *inode);
 struct integrity_iint_cache *integrity_inode_get(struct inode *inode);
+
+extern struct lsm_blob_sizes integrity_blob_sizes;
+static inline struct integrity_iint_cache **integrity_inode(
+						const struct inode *inode)
+{
+	return (struct integrity_iint_cache **)(inode->i_security +
+				       integrity_blob_sizes.lbs_inode);
+}
 
 int integrity_kernel_read(struct file *file, loff_t offset,
 			  void *addr, unsigned long count);
