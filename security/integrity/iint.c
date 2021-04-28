@@ -21,8 +21,10 @@
 #include <linux/lsm_hooks.h>
 #include "integrity.h"
 
+#ifdef IINT_RBTREE
 static struct rb_root integrity_iint_tree = RB_ROOT;
 static DEFINE_RWLOCK(integrity_iint_lock);
+#endif
 static struct kmem_cache *iint_cache __read_mostly;
 
 struct dentry *integrity_dir;
@@ -30,6 +32,7 @@ struct dentry *integrity_dir;
 /*
  * __integrity_iint_find - return the iint associated with an inode
  */
+#ifdef IINT_RBTREE
 static struct integrity_iint_cache *__integrity_iint_find(struct inode *inode)
 {
 	struct integrity_iint_cache *iint;
@@ -50,22 +53,31 @@ static struct integrity_iint_cache *__integrity_iint_find(struct inode *inode)
 
 	return iint;
 }
+#endif
 
 /*
  * integrity_iint_find - return the iint associated with an inode
  */
 struct integrity_iint_cache *integrity_iint_find(struct inode *inode)
 {
+#ifdef IINT_RBTREE
 	struct integrity_iint_cache *iint;
+#else
+	struct integrity_iint_cache **iint = integrity_inode(inode);
+#endif
 
 	if (!IS_IMA(inode))
 		return NULL;
 
+#ifdef IINT_RBTREE
 	read_lock(&integrity_iint_lock);
 	iint = __integrity_iint_find(inode);
 	read_unlock(&integrity_iint_lock);
 
 	return iint;
+#else
+	return *iint;
+#endif
 }
 
 static void iint_free(struct integrity_iint_cache *iint)
@@ -94,9 +106,13 @@ static void iint_free(struct integrity_iint_cache *iint)
  */
 struct integrity_iint_cache *integrity_inode_get(struct inode *inode)
 {
+#ifdef IINT_RBTREE
 	struct rb_node **p;
 	struct rb_node *node, *parent = NULL;
 	struct integrity_iint_cache *iint, *test_iint;
+#else
+	struct integrity_iint_cache **iint = integrity_inode(inode);
+#endif
 
 	/*
 	 * The integrity's "iint_cache" is initialized at security_init(),
@@ -106,6 +122,7 @@ struct integrity_iint_cache *integrity_inode_get(struct inode *inode)
 	if (!iint_cache)
 		panic("%s: lsm=integrity required.\n", __func__);
 
+#ifdef IINT_RBTREE
 	iint = integrity_iint_find(inode);
 	if (iint)
 		return iint;
@@ -113,7 +130,16 @@ struct integrity_iint_cache *integrity_inode_get(struct inode *inode)
 	iint = kmem_cache_alloc(iint_cache, GFP_NOFS);
 	if (!iint)
 		return NULL;
+#else
+	if (*iint)
+		return *iint;
 
+	*iint = kmem_cache_alloc(iint_cache, GFP_NOFS);
+	if (!*iint)
+		return NULL;
+#endif
+
+#ifdef IINT_RBTREE
 	write_lock(&integrity_iint_lock);
 
 	p = &integrity_iint_tree.rb_node;
@@ -135,6 +161,11 @@ struct integrity_iint_cache *integrity_inode_get(struct inode *inode)
 
 	write_unlock(&integrity_iint_lock);
 	return iint;
+#else
+	(*iint)->inode = inode;
+	inode->i_flags |= S_IMA;
+	return *iint;
+#endif
 }
 
 /**
@@ -145,17 +176,26 @@ struct integrity_iint_cache *integrity_inode_get(struct inode *inode)
  */
 static void integrity_inode_free(struct inode *inode)
 {
+#ifdef IINT_RBTREE
 	struct integrity_iint_cache *iint;
+#else
+	struct integrity_iint_cache **iint = integrity_inode(inode);
+#endif
 
 	if (!IS_IMA(inode))
 		return;
 
+#ifdef IINT_RBTREE
 	write_lock(&integrity_iint_lock);
 	iint = __integrity_iint_find(inode);
 	rb_erase(&iint->rb_node, &integrity_iint_tree);
 	write_unlock(&integrity_iint_lock);
 
 	iint_free(iint);
+#else
+	iint_free(*iint);
+	*iint = NULL;
+#endif
 }
 
 static void init_once(void *foo)
@@ -199,6 +239,7 @@ static int __init integrity_iintcache_init(void)
 }
 
 struct lsm_blob_sizes integrity_blob_sizes __lsm_ro_after_init = {
+	.lbs_inode = sizeof(struct integrity_iint_cache *),
 	.lbs_xattr = 1,
 };
 
