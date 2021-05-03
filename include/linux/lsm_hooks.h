@@ -258,6 +258,12 @@
  *	@dentry contains the dentry structure for the file to be created.
  *	@mode contains the file mode of the file to be created.
  *	Return 0 if permission is granted.
+ * @inode_post_create_tmpfile:
+ *	Update inode security field after a tmpfile has been created.
+ *	@mnt_userns: user namespace of the mount
+ *	@dir: inode of the base directory
+ *	@dentry: dentry of the new tmpfile
+ *	@mode: mode of the new tmpfile
  * @inode_link:
  *	Check permission before creating a new hard link to a file.
  *	@old_dentry contains the dentry structure for an existing
