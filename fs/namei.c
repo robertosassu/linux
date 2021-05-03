@@ -3426,6 +3426,7 @@ struct dentry *vfs_tmpfile(struct user_namespace *mnt_userns,
 		inode->i_state |= I_LINKABLE;
 		spin_unlock(&inode->i_lock);
 	}
+	security_inode_post_create_tmpfile(mnt_userns, dir, child, mode);
 	ima_post_create_tmpfile(mnt_userns, dir, child, mode);
 	return child;
 
