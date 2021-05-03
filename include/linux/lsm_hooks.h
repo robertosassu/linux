@@ -402,6 +402,9 @@
  *	@dentry contains the dentry structure for the file.
  *	@attr is the iattr structure containing the new file attributes.
  *	Return 0 if permission is granted.
+ * @inode_post_setattr:
+ *	Update inode security field after successful setting of file attributes
+ *	identified by @ia_valid for @dentry in @mnt_userns.
  * @path_truncate:
  *	Check permission before truncating a file.
  *	@path contains the path structure for the file.
