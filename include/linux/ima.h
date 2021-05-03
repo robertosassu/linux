@@ -17,7 +17,8 @@ struct linux_binprm;
 extern int ima_bprm_check(struct linux_binprm *bprm);
 extern int ima_file_check(struct file *file, int mask);
 extern void ima_post_create_tmpfile(struct user_namespace *mnt_userns,
-				    struct inode *inode);
+				    struct inode *dir, struct dentry *dentry,
+				    umode_t mode);
 extern void ima_file_free(struct file *file);
 extern int ima_file_mmap(struct file *file, unsigned long prot);
 extern int ima_file_mprotect(struct vm_area_struct *vma, unsigned long prot);
@@ -76,7 +77,8 @@ static inline int ima_file_check(struct file *file, int mask)
 }
 
 static inline void ima_post_create_tmpfile(struct user_namespace *mnt_userns,
-					   struct inode *inode)
+				struct inode *dir, struct dentry *dentry,
+				umode_t mode)
 {
 }
 

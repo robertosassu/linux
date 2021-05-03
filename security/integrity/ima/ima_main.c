@@ -631,16 +631,22 @@ EXPORT_SYMBOL_GPL(ima_inode_hash);
 /**
  * ima_post_create_tmpfile - mark newly created tmpfile as new
  * @mnt_userns:	user namespace of the mount the inode was found from
- * @file : newly created tmpfile
+ * @dir contains the path structure of parent of the new file
+ * @dentry contains the dentry structure of the new file
+ * @mode contains the mode of the new file
+ * @dev contains the undecoded device number. Use new_decode_dev() to get
+ *	the decoded device number
  *
  * No measuring, appraising or auditing of newly created tmpfiles is needed.
  * Skip calling process_measurement(), but indicate which newly, created
  * tmpfiles are in policy.
  */
 void ima_post_create_tmpfile(struct user_namespace *mnt_userns,
-			     struct inode *inode)
+			     struct inode *dir, struct dentry *dentry,
+			     umode_t mode)
 {
 	struct integrity_iint_cache *iint;
+	struct inode *inode = dentry->d_inode;
 	int must_appraise;
 
 	must_appraise = ima_must_appraise(mnt_userns, inode, MAY_ACCESS,
