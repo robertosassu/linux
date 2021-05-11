@@ -1048,7 +1048,7 @@ enum {
 	Opt_uid_lt, Opt_euid_lt, Opt_fowner_lt,
 	Opt_appraise_type, Opt_appraise_flag, Opt_appraise_algos,
 	Opt_permit_directio, Opt_pcr, Opt_template, Opt_keyrings,
-	Opt_label, Opt_err
+	Opt_label, Opt_use_diglim, Opt_err
 };
 
 static const match_table_t policy_tokens = {
@@ -1087,6 +1087,7 @@ static const match_table_t policy_tokens = {
 	{Opt_template, "template=%s"},
 	{Opt_keyrings, "keyrings=%s"},
 	{Opt_label, "label=%s"},
+	{Opt_use_diglim, "use_diglim"},
 	{Opt_err, NULL}
 };
 
@@ -1181,6 +1182,15 @@ static bool ima_validate_rule(struct ima_rule_entry *entry)
 	if (entry->action != MEASURE && entry->flags & IMA_PCR)
 		return false;
 
+	/*
+	 * Ensure that measurements made with DIGLIM don't have the standard
+	 * IMA PCR.
+	 */
+	if ((entry->flags & IMA_USE_DIGLIM_MEASURE) &&
+	    (!(entry->flags & IMA_PCR) ||
+	     entry->pcr == CONFIG_IMA_MEASURE_PCR_IDX))
+		return false;
+
 	if (entry->action != APPRAISE &&
 	    entry->flags & (IMA_DIGSIG_REQUIRED | IMA_MODSIG_ALLOWED |
 			    IMA_CHECK_BLACKLIST | IMA_VALIDATE_ALGOS |
@@ -1215,7 +1225,9 @@ static bool ima_validate_rule(struct ima_rule_entry *entry)
 				     IMA_INMASK | IMA_EUID | IMA_PCR |
 				     IMA_FSNAME | IMA_DIGSIG_REQUIRED |
 				     IMA_PERMIT_DIRECTIO | IMA_VALIDATE_ALGOS |
-				     IMA_META_IMMUTABLE_REQUIRED))
+				     IMA_META_IMMUTABLE_REQUIRED |
+				     IMA_USE_DIGLIM_MEASURE |
+				     IMA_USE_DIGLIM_APPRAISE))
 			return false;
 
 		break;
@@ -1229,7 +1241,9 @@ static bool ima_validate_rule(struct ima_rule_entry *entry)
 				     IMA_FSNAME | IMA_DIGSIG_REQUIRED |
 				     IMA_PERMIT_DIRECTIO | IMA_MODSIG_ALLOWED |
 				     IMA_CHECK_BLACKLIST | IMA_VALIDATE_ALGOS |
-				     IMA_META_IMMUTABLE_REQUIRED))
+				     IMA_META_IMMUTABLE_REQUIRED |
+				     IMA_USE_DIGLIM_MEASURE |
+				     IMA_USE_DIGLIM_APPRAISE))
 			return false;
 
 		break;
@@ -1719,6 +1733,19 @@ static int ima_parse_rule(char *rule, struct ima_rule_entry *entry)
 						 &(template_desc->num_fields));
 			entry->template = template_desc;
 			break;
+		case Opt_use_diglim:
+			ima_log_string(ab, "use_diglim", args[0].from);
+			if (entry->action != IMA_MEASURE &&
+			    entry->action != IMA_APPRAISE) {
+				result = -EINVAL;
+				break;
+			}
+
+			if (entry->action == IMA_MEASURE)
+				entry->flags |= IMA_USE_DIGLIM_MEASURE;
+			else
+				entry->flags |= IMA_USE_DIGLIM_APPRAISE;
+			break;
 		case Opt_err:
 			ima_log_string(ab, "UNKNOWN", p);
 			result = -EINVAL;
@@ -2058,6 +2085,9 @@ int ima_policy_show(struct seq_file *m, void *v)
 		seq_puts(m, "appraise_type=meta_immutable ");
 	if (entry->flags & IMA_PERMIT_DIRECTIO)
 		seq_puts(m, "permit_directio ");
+	if ((entry->flags & IMA_USE_DIGLIM_MEASURE) ||
+	    (entry->flags & IMA_USE_DIGLIM_APPRAISE))
+		seq_puts(m, "use_diglim ");
 	rcu_read_unlock();
 	seq_puts(m, "\n");
 	return 0;

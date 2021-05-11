@@ -27,7 +27,7 @@ Description:
 			lsm:	[[subj_user=] [subj_role=] [subj_type=]
 				 [obj_user=] [obj_role=] [obj_type=]]
 			option:	[[appraise_type=]] [template=] [permit_directio]
-				[appraise_flag=] [appraise_algos=] [keyrings=]
+				[appraise_flag=] [appraise_algos=] [keyrings=] [use_diglim]
 		  base:
 			func:= [BPRM_CHECK][MMAP_CHECK][CREDS_CHECK][FILE_CHECK][MODULE_CHECK]
 				[FIRMWARE_CHECK]
@@ -60,6 +60,8 @@ Description:
 			For example, "sha256,sha512" to only accept to appraise
 			files where the security.ima xattr was hashed with one
 			of these two algorithms.
+			use_diglim: enables usage of DIGLIM for measurement and
+			appraisal
 
 		  default policy:
 			# PROC_SUPER_MAGIC
