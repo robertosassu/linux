@@ -377,7 +377,9 @@ int ima_appraise_measurement(enum ima_hooks func,
 			     struct integrity_iint_cache *iint,
 			     struct file *file, const unsigned char *filename,
 			     struct evm_ima_xattr_data *xattr_value,
-			     int xattr_len, const struct modsig *modsig)
+			     int xattr_len, const struct modsig *modsig,
+			     u16 file_modifiers, u8 file_actions,
+			     u16 metadata_modifiers, u8 metadata_actions)
 {
 	static const char op[] = "appraise_data";
 	const char *cause = "unknown";
@@ -387,12 +389,26 @@ int ima_appraise_measurement(enum ima_hooks func,
 	int rc = xattr_len;
 	bool try_modsig = iint->flags & IMA_MODSIG_ALLOWED && modsig;
 
-	/* If not appraising a modsig, we need an xattr. */
-	if (!(inode->i_opflags & IOP_XATTR) && !try_modsig)
+	/* We are interested only in appraisal-related flags. */
+	file_actions &= COMPACT_ACTION_IMA_APPRAISED_DIGSIG;
+	metadata_actions &= COMPACT_ACTION_IMA_APPRAISED_DIGSIG;
+
+	/* Disable DIGLIM method for appraisal if not enabled in the policy. */
+	if (!(iint->flags & IMA_USE_DIGLIM_APPRAISE)) {
+		file_actions = 0;
+		metadata_actions = 0;
+	}
+
+	/* If not appraising a modsig or using DIGLIM, we need an xattr. */
+	if (!(inode->i_opflags & IOP_XATTR) && !try_modsig &&
+	    !file_actions && !metadata_actions)
 		return INTEGRITY_UNKNOWN;
 
-	/* If reading the xattr failed and there's no modsig, error out. */
-	if (rc <= 0 && !try_modsig) {
+	/*
+	 * If reading the xattr failed, there's no modsig and the DIGLIM
+	 * appraisal method is not available, error out.
+	 */
+	if (rc <= 0 && !try_modsig && !file_actions && !metadata_actions) {
 		if (rc && rc != -ENODATA)
 			goto out;
 
@@ -420,6 +436,10 @@ int ima_appraise_measurement(enum ima_hooks func,
 			break;
 		fallthrough;
 	case INTEGRITY_NOLABEL:		/* No security.evm xattr. */
+		if (metadata_actions) {
+			status = INTEGRITY_PASS_IMMUTABLE;
+			break;
+		}
 		cause = "missing-HMAC";
 		goto out;
 	case INTEGRITY_FAIL_IMMUTABLE:
@@ -455,6 +475,13 @@ int ima_appraise_measurement(enum ima_hooks func,
 	     rc == -ENOKEY))
 		rc = modsig_verify(func, modsig, &status, &cause);
 
+	if (!xattr_value && !try_modsig && (file_actions || metadata_actions)) {
+		status = INTEGRITY_PASS;
+
+		if ((file_modifiers & (1 << COMPACT_MOD_IMMUTABLE)) ||
+		    (metadata_modifiers & (1 << COMPACT_MOD_IMMUTABLE)))
+			set_bit(IMA_DIGSIG, &iint->atomic_flags);
+	}
 out:
 	/*
 	 * File signatures on some filesystems can not be properly verified.
