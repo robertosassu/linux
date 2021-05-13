@@ -551,3 +551,61 @@ int ima_eventevmsig_init(struct ima_event_data *event_data,
 	kfree(xattr_data);
 	return rc;
 }
+
+static int ima_eventinodedac_init_common(struct ima_event_data *event_data,
+					 struct ima_field_data *field_data,
+					 bool get_uid)
+{
+	struct user_namespace *mnt_userns;
+	uid_t uid;
+	gid_t gid;
+	char *data_ptr = (char *)&uid;
+
+	if (!event_data->file)
+		return 0;
+
+	mnt_userns = file_mnt_user_ns(event_data->file);
+	if (get_uid) {
+		uid = from_kuid(&init_user_ns,
+				i_uid_into_mnt(mnt_userns,
+					       file_inode(event_data->file)));
+	} else {
+		gid = from_kgid(&init_user_ns,
+				i_gid_into_mnt(mnt_userns,
+					       file_inode(event_data->file)));
+		data_ptr = (char *)&gid;
+	}
+
+	if (ima_canonical_fmt) {
+		if (sizeof(uid) == sizeof(u16)) {
+			uid = cpu_to_le16(uid);
+			gid = cpu_to_le16(gid);
+		} else {
+			uid = cpu_to_le32(uid);
+			gid = cpu_to_le32(gid);
+		}
+	}
+
+	return ima_write_template_field_data(data_ptr, sizeof(uid),
+					     DATA_FMT_UINT, field_data);
+}
+
+/*
+ *  ima_eventinodeuid_init - include the inode UID as part of the template
+ *  data
+ */
+int ima_eventinodeuid_init(struct ima_event_data *event_data,
+			   struct ima_field_data *field_data)
+{
+	return ima_eventinodedac_init_common(event_data, field_data, true);
+}
+
+/*
+ *  ima_eventinodegid_init - include the inode GID as part of the template
+ *  data
+ */
+int ima_eventinodegid_init(struct ima_event_data *event_data,
+			   struct ima_field_data *field_data)
+{
+	return ima_eventinodedac_init_common(event_data, field_data, false);
+}
