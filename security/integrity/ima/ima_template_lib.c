@@ -609,3 +609,86 @@ int ima_eventinodegid_init(struct ima_event_data *event_data,
 {
 	return ima_eventinodedac_init_common(event_data, field_data, false);
 }
+
+int ima_eventmnt_userns_common_init(struct ima_event_data *event_data,
+				    struct ima_field_data *field_data,
+				    bool get_uid_map)
+{
+	struct user_namespace *mnt_userns;
+	u8 *buf, *buf_ptr;
+	struct uid_gid_map *map;
+	int rc, i;
+
+	if (!event_data->file)
+		return 0;
+
+	mnt_userns = file_mnt_user_ns(event_data->file);
+	if (mnt_userns == &init_user_ns)
+		return 0;
+
+	map = &mnt_userns->uid_map;
+	if (!get_uid_map)
+		map = &mnt_userns->gid_map;
+
+	buf_ptr = buf = kmalloc(sizeof(map->nr_extents) +
+				map->nr_extents * sizeof(*map->extent),
+				GFP_KERNEL);
+	if (!buf)
+		return 0;
+
+	memcpy(buf_ptr, &map->nr_extents, sizeof(map->nr_extents));
+
+	if (ima_canonical_fmt)
+		*(u32 *)buf_ptr = cpu_to_le32(*(u32 *)buf_ptr);
+
+	buf_ptr += sizeof(u32);
+
+	for (i = 0; i < map->nr_extents; i++) {
+		struct uid_gid_extent *extent;
+
+		/* Taken from m_start() in kernel/user_namespace.c. */
+		if (map->nr_extents <= UID_GID_MAP_MAX_BASE_EXTENTS)
+			extent = &map->extent[i];
+		else
+			extent = &map->forward[i];
+
+		memcpy(buf_ptr, &extent->first, sizeof(extent->first));
+		if (ima_canonical_fmt)
+			*(u32 *)buf_ptr = cpu_to_le32(*(u32 *)buf_ptr);
+		buf_ptr += sizeof(extent->first);
+		memcpy(buf_ptr, &extent->lower_first,
+		       sizeof(extent->lower_first));
+		if (ima_canonical_fmt)
+			*(u32 *)buf_ptr = cpu_to_le32(*(u32 *)buf_ptr);
+		buf_ptr += sizeof(extent->lower_first);
+		memcpy(buf_ptr, &extent->count, sizeof(extent->count));
+		if (ima_canonical_fmt)
+			*(u32 *)buf_ptr = cpu_to_le32(*(u32 *)buf_ptr);
+		buf_ptr += sizeof(extent->count);
+	}
+
+	rc = ima_write_template_field_data((char *)buf, buf_ptr - buf,
+					   DATA_FMT_HEX, field_data);
+	kfree(buf);
+	return rc;
+}
+
+/*
+ *  ima_eventmnt_userns_uid_map_init - include the UID mappings of the idmapped
+ *  mount as part of the template data
+ */
+int ima_eventmnt_userns_uid_map_init(struct ima_event_data *event_data,
+				     struct ima_field_data *field_data)
+{
+	return ima_eventmnt_userns_common_init(event_data, field_data, true);
+}
+
+/*
+ *  ima_eventmnt_userns_gid_map_init - include the GID mappings of the idmapped
+ *  mount as part of the template data
+ */
+int ima_eventmnt_userns_gid_map_init(struct ima_event_data *event_data,
+				     struct ima_field_data *field_data)
+{
+	return ima_eventmnt_userns_common_init(event_data, field_data, false);
+}

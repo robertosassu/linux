@@ -77,6 +77,10 @@ descriptors by adding their identifier to the format string
  - 'evmsig': the EVM portable signature;
  - 'iuid': the inode UID;
  - 'igid': the inode GID;
+ - 'mntuidmap': the UID mappings of the idmapped mount (nr extents,
+    [ uid_gid_extent1 ] ... [ uid_gid_extentN ], all u32 in canonical format);
+ - 'mntgidmap': the GID mappings of the idmapped mount (same format as
+   'mntuidmap');
 
 
 Below, there is the list of defined template descriptors:

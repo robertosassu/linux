@@ -54,4 +54,8 @@ int ima_eventinodeuid_init(struct ima_event_data *event_data,
 			   struct ima_field_data *field_data);
 int ima_eventinodegid_init(struct ima_event_data *event_data,
 			   struct ima_field_data *field_data);
+int ima_eventmnt_userns_uid_map_init(struct ima_event_data *event_data,
+				     struct ima_field_data *field_data);
+int ima_eventmnt_userns_gid_map_init(struct ima_event_data *event_data,
+				     struct ima_field_data *field_data);
 #endif /* __LINUX_IMA_TEMPLATE_LIB_H */
