@@ -692,3 +692,25 @@ int ima_eventmnt_userns_gid_map_init(struct ima_event_data *event_data,
 {
 	return ima_eventmnt_userns_common_init(event_data, field_data, false);
 }
+
+/*
+ *  ima_eventinodemode_init - include the inode mode as part of the template
+ *  data
+ */
+int ima_eventinodemode_init(struct ima_event_data *event_data,
+			    struct ima_field_data *field_data)
+{
+	struct inode *inode;
+	umode_t mode;
+
+	if (!event_data->file)
+		return 0;
+
+	inode = file_inode(event_data->file);
+	mode = inode->i_mode;
+	if (ima_canonical_fmt)
+		mode = cpu_to_le16(mode);
+
+	return ima_write_template_field_data((char *)&mode, sizeof(mode),
+					     DATA_FMT_UINT, field_data);
+}

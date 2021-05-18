@@ -81,6 +81,7 @@ descriptors by adding their identifier to the format string
     [ uid_gid_extent1 ] ... [ uid_gid_extentN ], all u32 in canonical format);
  - 'mntgidmap': the GID mappings of the idmapped mount (same format as
    'mntuidmap');
+ - 'imode': the inode mode;
 
 
 Below, there is the list of defined template descriptors:
