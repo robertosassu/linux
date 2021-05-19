@@ -11,6 +11,7 @@
 
 #include "ima_template_lib.h"
 #include <linux/xattr.h>
+#include <linux/evm.h>
 
 static bool ima_template_hash_algo_allowed(u8 algo)
 {
@@ -713,4 +714,124 @@ int ima_eventinodemode_init(struct ima_event_data *event_data,
 
 	return ima_write_template_field_data((char *)&mode, sizeof(mode),
 					     DATA_FMT_UINT, field_data);
+}
+
+/*
+ *  ima_eventinodeevmxattrs_init - include the number of EVM protected xattrs,
+ *  the xattr names, lengths and values as part of the template data
+ */
+int ima_eventinodeevmxattrs_init(struct ima_event_data *event_data,
+				 struct ima_field_data *field_data)
+
+{
+	struct inode *inode;
+	u8 *buffer = NULL;
+	char *xattr_names, *xattr_names_ptr, *xattr_name;
+	size_t names_size, total_size;
+	u32 num_xattrs = 0, xattr_value_len;
+	loff_t names_offset, lengths_offset, values_offset;
+	int rc, evm_present = 0;
+
+	if (!event_data->file)
+		return 0;
+
+	inode = file_inode(event_data->file);
+	if (!inode->i_op->listxattr || !(inode->i_opflags & IOP_XATTR))
+		return 0;
+
+	names_size = inode->i_op->listxattr(file_dentry(event_data->file),
+					    NULL, 0);
+	if (names_size <= 0)
+		return 0;
+
+	xattr_names = kmalloc(names_size, GFP_KERNEL);
+	if (!xattr_names)
+		return 0;
+
+	names_size = inode->i_op->listxattr(file_dentry(event_data->file),
+					    xattr_names, names_size);
+	if (names_size <= 0)
+		goto out;
+
+	xattr_names_ptr = xattr_names;
+	total_size = sizeof(num_xattrs);
+	lengths_offset = total_size;
+
+	while (xattr_names_ptr < xattr_names + names_size) {
+		xattr_name = xattr_names_ptr;
+		xattr_names_ptr += strlen(xattr_names_ptr) + 1;
+
+		if (!strcmp(xattr_name, XATTR_NAME_EVM)) {
+			evm_present = 1;
+			continue;
+		}
+
+		if (!evm_protected_xattr_if_enabled(xattr_name))
+			continue;
+
+		total_size += xattr_names_ptr - xattr_name;
+		lengths_offset += xattr_names_ptr - xattr_name;
+		total_size += sizeof(xattr_value_len);
+		rc = __vfs_getxattr(file_dentry(event_data->file),
+				    file_inode(event_data->file), xattr_name,
+				    NULL, 0);
+		xattr_value_len = (rc >= 0) ? rc : 0;
+		total_size += xattr_value_len;
+		num_xattrs++;
+	}
+
+	/*
+	 * Don't provide data if security.evm is not found or there are no
+	 * protected xattrs.
+	 */
+	if (!evm_present || !num_xattrs)
+		return 0;
+
+	buffer = kmalloc(total_size, GFP_KERNEL);
+	if (!buffer)
+		goto out;
+
+	*(u32 *)buffer = num_xattrs;
+	if (ima_canonical_fmt)
+		*(u32 *)buffer = cpu_to_le32(*(u32 *)buffer);
+
+	names_offset = sizeof(num_xattrs);
+	values_offset = lengths_offset + num_xattrs * sizeof(xattr_value_len);
+
+	xattr_names_ptr = xattr_names;
+
+	while (xattr_names_ptr < xattr_names + names_size) {
+		xattr_name = xattr_names_ptr;
+		xattr_names_ptr += strlen(xattr_names_ptr) + 1;
+
+		if (!strcmp(xattr_name, XATTR_NAME_EVM))
+			continue;
+
+		if (!evm_protected_xattr_if_enabled(xattr_name))
+			continue;
+
+		memcpy(buffer + names_offset, xattr_name,
+		       xattr_names_ptr - xattr_name);
+		names_offset += xattr_names_ptr - xattr_name;
+
+		rc = __vfs_getxattr(file_dentry(event_data->file),
+				    file_inode(event_data->file), xattr_name,
+				    buffer + values_offset,
+				    total_size - values_offset);
+		xattr_value_len = (rc >= 0) ? rc : 0;
+		*(u32 *)(buffer + lengths_offset) = xattr_value_len;
+		if (ima_canonical_fmt)
+			*(u32 *)(buffer + lengths_offset) =
+				cpu_to_le32(*(u32 *)(buffer + lengths_offset));
+
+		lengths_offset += sizeof(xattr_value_len);
+		values_offset += xattr_value_len;
+	}
+
+	rc = ima_write_template_field_data((char *)buffer, total_size,
+					   DATA_FMT_HEX, field_data);
+out:
+	kfree(xattr_names);
+	kfree(buffer);
+	return rc;
 }

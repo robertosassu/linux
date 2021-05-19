@@ -59,6 +59,8 @@ static const struct ima_template_field supported_fields[] = {
 	 .field_show = ima_show_template_sig},
 	{.field_id = "imode", .field_init = ima_eventinodemode_init,
 	 .field_show = ima_show_template_uint},
+	{.field_id = "evmxattrs", .field_init = ima_eventinodeevmxattrs_init,
+	 .field_show = ima_show_template_sig},
 };
 
 /*

@@ -82,6 +82,9 @@ descriptors by adding their identifier to the format string
  - 'mntgidmap': the GID mappings of the idmapped mount (same format as
    'mntuidmap');
  - 'imode': the inode mode;
+ - 'evmxattrs': the EVM protected xattrs (num xattrs (u32 in canonical format),
+    xattr names separated by \0, xattr lengths (u32 in canonical format) and
+    xattr values);
 
 
 Below, there is the list of defined template descriptors:
