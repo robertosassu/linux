@@ -442,6 +442,15 @@ out_locked:
 	if (must_appraise)
 		if (rc && (ima_appraise & IMA_APPRAISE_ENFORCE))
 			action &= ~(IMA_MEASURE | IMA_AUDIT);
+	/* Use DIGLIM method for measurement if enabled in the policy. */
+	if (action & IMA_MEASURE && (iint->flags & IMA_USE_DIGLIM_MEASURE)) {
+		if (file_actions & (1 << COMPACT_ACTION_IMA_MEASURED) ||
+		    metadata_actions & (1 << COMPACT_ACTION_IMA_MEASURED)) {
+			iint->flags |= IMA_MEASURED;
+			iint->measured_pcrs |= (0x1 << pcr);
+			action &= ~IMA_MEASURE;
+		}
+	}
 	if (action & IMA_MEASURE)
 		ima_store_measurement(iint, file, pathname,
 				      xattr_value, xattr_len, modsig, pcr,
