@@ -162,6 +162,10 @@ static struct ima_rule_entry default_measurement_rules[] __ro_after_init = {
 	{.action = MEASURE, .func = POLICY_CHECK, .flags = IMA_FUNC},
 };
 
+static struct ima_rule_entry diglim_measure_rule __ro_after_init = {
+	.action = MEASURE, .func = DIGEST_LIST_CHECK, .flags = IMA_FUNC
+};
+
 static struct ima_rule_entry default_appraise_rules[] __ro_after_init = {
 	{.action = DONT_APPRAISE, .fsmagic = PROC_SUPER_MAGIC, .flags = IMA_FSMAGIC},
 	{.action = DONT_APPRAISE, .fsmagic = SYSFS_MAGIC, .flags = IMA_FSMAGIC},
@@ -228,6 +232,11 @@ static struct ima_rule_entry secure_boot_rules[] __ro_after_init = {
 	 .flags = IMA_FUNC | IMA_DIGSIG_REQUIRED},
 };
 
+static struct ima_rule_entry diglim_appraise_rule __ro_after_init = {
+	.action = APPRAISE, .func = DIGEST_LIST_CHECK,
+	.flags = IMA_FUNC | IMA_DIGSIG_REQUIRED | IMA_MODSIG_ALLOWED
+};
+
 static struct ima_rule_entry critical_data_rules[] __ro_after_init = {
 	{.action = MEASURE, .func = CRITICAL_DATA, .flags = IMA_FUNC},
 };
@@ -253,9 +262,12 @@ static int __init default_measure_policy_setup(char *str)
 __setup("ima_tcb", default_measure_policy_setup);
 
 static unsigned int ima_measure_skip_flags __initdata;
+static unsigned int ima_measure_diglim __initdata;
 static unsigned int ima_appraise_skip_flags __initdata;
+static unsigned int ima_diglim_pcr __initdata = 11;
 static bool ima_use_appraise_tcb __initdata;
 static bool ima_use_appraise_exec_immutable __initdata;
+static bool ima_use_appraise_diglim __initdata;
 static bool ima_use_secure_boot __initdata;
 static bool ima_use_critical_data __initdata;
 static bool ima_fail_unverifiable_sigs __ro_after_init;
@@ -273,7 +285,9 @@ static int __init policy_setup(char *str)
 		else if ((strcmp(p, "exec_tcb") == 0) && !ima_policy) {
 			ima_policy = DEFAULT_TCB;
 			ima_measure_skip_flags |= IMA_SKIP_OPEN;
-		} else if (strcmp(p, "appraise_tcb") == 0)
+		} else if (strcmp(p, "diglim") == 0)
+			ima_measure_diglim = true;
+		else if (strcmp(p, "appraise_tcb") == 0)
 			ima_use_appraise_tcb = true;
 		else if ((strcmp(p, "appraise_tmpfs") == 0))
 			ima_appraise_skip_flags |= IMA_SKIP_TMPFS;
@@ -282,6 +296,8 @@ static int __init policy_setup(char *str)
 			ima_appraise_skip_flags |= IMA_SKIP_OPEN;
 		} else if (strcmp(p, "appraise_exec_immutable") == 0)
 			ima_use_appraise_exec_immutable = true;
+		else if (strcmp(p, "appraise_diglim") == 0)
+			ima_use_appraise_diglim = true;
 		else if (strcmp(p, "secure_boot") == 0)
 			ima_use_secure_boot = true;
 		else if (strcmp(p, "critical_data") == 0)
@@ -302,6 +318,28 @@ static int __init default_appraise_policy_setup(char *str)
 	return 1;
 }
 __setup("ima_appraise_tcb", default_appraise_policy_setup);
+
+static int __init default_diglim_pcr_setup(char *str)
+{
+	unsigned int pcr;
+	int ret;
+
+	ret = kstrtouint(str, 10, &pcr);
+	if (ret < 0 || pcr > 23) {
+		pr_err("Invalid value for ima_diglim_pcr=\n");
+		return 1;
+	}
+
+	/* Using the default IMA PCR is forbidden. */
+	if (ret == CONFIG_IMA_MEASURE_PCR_IDX) {
+		pr_err("Default IMA PCR cannot be used for ima_diglim_pcr=\n");
+		return 1;
+	}
+
+	ima_diglim_pcr = pcr;
+	return 1;
+}
+__setup("ima_diglim_pcr=", default_diglim_pcr_setup);
 
 static struct ima_rule_opt_list *ima_alloc_rule_opt_list(const substring_t *src)
 {
@@ -812,6 +850,61 @@ void ima_update_policy_flags(void)
 	ima_policy_flag = new_policy_flag;
 }
 
+/*
+ * Add the IMA_USE_DIGLIM_MEASURE and IMA_USE_DIGLIM_APPRAISE flags to the
+ * initial policy depending on the options in the kernel command line, and set
+ * the correct PCR for the measure rules.
+ */
+static void __init ima_add_diglim_flag(void)
+{
+	struct ima_rule_entry *entry;
+
+	if (!IS_ENABLED(CONFIG_DIGLIM))
+		return;
+
+	if (!ima_measure_diglim && !ima_use_appraise_diglim)
+		return;
+
+	list_for_each_entry(entry, ima_rules, list) {
+		if (entry->action != IMA_MEASURE &&
+		    entry->action != IMA_APPRAISE)
+			continue;
+
+		if (entry->action == IMA_MEASURE && !ima_measure_diglim)
+			continue;
+
+		if (entry->action == IMA_APPRAISE &&
+		    !ima_use_appraise_diglim)
+			continue;
+
+		switch (entry->func) {
+		case BPRM_CHECK:
+			fallthrough;
+		case CREDS_CHECK:
+			fallthrough;
+		case MMAP_CHECK:
+			fallthrough;
+		case FILE_CHECK:
+			fallthrough;
+		case MODULE_CHECK:
+			fallthrough;
+		case FIRMWARE_CHECK:
+			fallthrough;
+		case DIGEST_LIST_CHECK:
+			if (entry->action == IMA_MEASURE) {
+				entry->flags |= IMA_USE_DIGLIM_MEASURE;
+				entry->flags |= IMA_PCR;
+				entry->pcr = ima_diglim_pcr;
+			} else {
+				entry->flags |= IMA_USE_DIGLIM_APPRAISE;
+			}
+			break;
+		default:
+			break;
+		}
+	}
+}
+
 static int ima_appraise_flag(enum ima_hooks func)
 {
 	if (func == MODULE_CHECK)
@@ -989,7 +1082,14 @@ void __init ima_init_policy(void)
 
 	atomic_set(&ima_setxattr_allowed_hash_algorithms, 0);
 
+	if (ima_measure_diglim)
+		add_rules(&diglim_measure_rule, 1, IMA_DEFAULT_POLICY, 0);
+
+	if (ima_use_appraise_diglim)
+		add_rules(&diglim_appraise_rule, 1, IMA_DEFAULT_POLICY, 0);
+
 	ima_update_policy_flags();
+	ima_add_diglim_flag();
 }
 
 /* Make sure we have a valid policy, at least containing some rules. */
