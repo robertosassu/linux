@@ -56,4 +56,10 @@ int ima_eventinodegid_init(struct ima_event_data *event_data,
 			   struct ima_field_data *field_data);
 int ima_eventinodemode_init(struct ima_event_data *event_data,
 			    struct ima_field_data *field_data);
+int ima_eventinodeevmxattrnames_init(struct ima_event_data *event_data,
+				     struct ima_field_data *field_data);
+int ima_eventinodeevmxattrlengths_init(struct ima_event_data *event_data,
+				       struct ima_field_data *field_data);
+int ima_eventinodeevmxattrvalues_init(struct ima_event_data *event_data,
+				      struct ima_field_data *field_data);
 #endif /* __LINUX_IMA_TEMPLATE_LIB_H */

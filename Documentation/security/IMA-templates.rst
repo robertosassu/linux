@@ -78,6 +78,11 @@ descriptors by adding their identifier to the format string
  - 'iuid': the inode UID;
  - 'igid': the inode GID;
  - 'imode': the inode mode;
+ - 'evmxattrnames': the concatenated EVM protected xattr names (separated by |),
+    only if the xattr is present;
+ - 'evmxattrlengths': the concatenated EVM protected xattr lengths (u32), only
+    if the xattr is present;
+ - 'evmxattrvalues': the concatenated EVM protected xattr values;
 
 
 Below, there is the list of defined template descriptors:
