@@ -318,6 +318,87 @@ int evm_protected_xattr_if_enabled(const char *req_xattr_name)
 }
 
 /**
+ * evm_read_protected_xattrs - read EVM protected xattrs names, lengths, values
+ * @dentry: dentry of the read xattr
+ * @inode: inode of the read xattr
+ * @buffer: buffer xattr names, lengths or values are copied to
+ * @buffer_size: size of buffer
+ * @type: n: names, l: lengths, v: values
+ * @canonical_fmt: data format (IMA canonical format: little endian)
+ *
+ * Read protected xattrs names (separated by |), lengths (u32) or values for a
+ * given dentry and return the total size of copied data. If buffer is NULL,
+ * just return the total size.
+ *
+ * Returns the total size on success, a negative value on error.
+ */
+int evm_read_protected_xattrs(struct dentry *dentry, u8 *buffer,
+			      int buffer_size, char type, bool canonical_fmt)
+{
+	u8 *buffer_ptr = buffer;
+	struct xattr_list *xattr;
+	int rc, size, total_size = 0;
+
+	list_for_each_entry_lockless(xattr, &evm_config_xattrnames, list) {
+		switch (type) {
+		case 'n':
+			size = strlen(xattr->name) + 1;
+			if (buffer) {
+				memcpy(buffer_ptr, xattr->name, size);
+				if (!list_is_last(&xattr->list,
+				    &evm_config_xattrnames))
+					buffer_ptr[size - 1] = '|';
+			}
+			break;
+		case 'l':
+			size = sizeof(u32);
+			if (buffer) {
+				rc = __vfs_getxattr(dentry,
+						    d_backing_inode(dentry),
+						    xattr->name, NULL, 0);
+				if (rc < 0 && rc == -ENODATA)
+					rc = 0;
+				else if (rc < 0)
+					return rc;
+
+				if (canonical_fmt)
+					rc = cpu_to_le32(rc);
+
+				*(u32 *)buffer_ptr = rc;
+			}
+			break;
+		case 'v':
+			rc = __vfs_getxattr(dentry, d_backing_inode(dentry),
+					    xattr->name, NULL, 0);
+			if (rc < 0 && rc == -ENODATA)
+				continue;
+			else if (rc < 0)
+				return rc;
+
+			size = rc;
+
+			if (buffer) {
+				rc = __vfs_getxattr(dentry,
+					d_backing_inode(dentry), xattr->name,
+					buffer_ptr,
+					buffer_size - (buffer_ptr - buffer));
+				if (rc < 0)
+					return rc;
+			}
+			break;
+		default:
+			return -EINVAL;
+		}
+
+		total_size += size;
+		if (buffer)
+			buffer_ptr += size;
+	}
+
+	return total_size;
+}
+
+/**
  * evm_verifyxattr - verify the integrity of the requested xattr
  * @dentry: object of the verify xattr
  * @xattr_name: requested xattr
