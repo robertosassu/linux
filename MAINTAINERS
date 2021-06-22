@@ -5502,6 +5502,15 @@ L:	linux-gpio@vger.kernel.org
 S:	Maintained
 F:	drivers/gpio/gpio-gpio-mm.c
 
+DIGLIM
+M:	Roberto Sassu <roberto.sassu@huawei.com>
+L:	linux-integrity@vger.kernel.org
+S:	Supported
+T:	git://git.kernel.org/pub/scm/linux/kernel/git/zohar/linux-integrity.git
+F:	Documentation/security/diglim/architecture.rst
+F:	Documentation/security/diglim/index.rst
+F:	Documentation/security/diglim/introduction.rst
+
 DIOLAN U2C-12 I2C DRIVER
 M:	Guenter Roeck <linux@roeck-us.net>
 L:	linux-i2c@vger.kernel.org
