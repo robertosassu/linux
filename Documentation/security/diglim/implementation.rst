@@ -95,3 +95,81 @@ with digest lists:
 
 - ``DIGEST_LIST_ADD``: the digest list is being added;
 - ``DIGEST_LIST_DEL``: the digest list is being deleted.
+
+
+Objects
+-------
+
+This section defines the objects to manage digest lists.
+
+.. kernel-doc:: security/integrity/diglim/diglim.h
+
+They are represented in the following class diagram::
+
+ digest_offset,
+ hdr_offset---------------+
+                          |
+                          |
+ +------------------+     |     +----------------------+
+ | digest_list_item |--- N:1 ---| digest_list_item_ref |
+ +------------------+           +----------------------+
+                                           |
+                                          1:N
+                                           |
+                                    +-------------+
+                                    | digest_item |
+                                    +-------------+
+
+A ``digest_list_item`` is associated to one or multiple
+``digest_list_item_ref``, one for each digest it contains. However,
+a ``digest_list_item_ref`` is associated to only one ``digest_list_item``,
+as it represents a single location within a specific digest list.
+
+Given that a ``digest_list_item_ref`` represents a single location, it is
+associated to only one ``digest_item``. However, a ``digest_item`` can have
+multiple references (as it might appears multiple times within the same
+digest list or in different digest lists, if it is duplicated).
+
+All digest list references are stored for a given digest, so that a query
+result can include the OR of the modifiers and actions of each referenced
+digest list.
+
+The relationship between the described objects can be graphically
+represented as::
+
+ Hash table            +-------------+         +-------------+
+ PARSER      +-----+   | digest_item |         | digest_item |
+ FILE        | key |-->|             |-->...-->|             |
+ METADATA    +-----+   |ref0|...|refN|         |ref0|...|refN|
+                       +-------------+         +-------------+
+            ref0:         |                               | refN:
+            digest_offset | +-----------------------------+ digest_offset
+            hdr_offset    | |                               hdr_offset
+                          | |
+                          V V
+                     +--------------------+
+                     |  digest_list_item  |
+                     |                    |
+                     | size, buf, actions |
+                     +--------------------+
+                          ^
+                          |
+ Hash table            +-------------+         +-------------+
+ DIGEST_LIST +-----+   |ref0         |         |ref0         |
+             | key |-->|             |-->...-->|             |
+             +-----+   | digest_item |         | digest_item |
+                       +-------------+         +-------------+
+
+The reference for the digest of the digest list differs from the references
+for the other digest types. ``digest_offset`` and ``hdr_offset`` are set to
+zero, so that the digest of the digest list is retrieved from the
+``digest_list_item`` structure directly (see ``get_digest()`` below).
+
+Finally, this section defines useful helpers to access a digest or the
+header the digest belongs to. For example:
+
+.. kernel-doc:: security/integrity/diglim/diglim.h
+   :identifiers: get_hdr
+
+.. kernel-doc:: security/integrity/diglim/diglim.h
+   :identifiers: get_digest
