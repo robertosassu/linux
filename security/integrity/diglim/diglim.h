@@ -218,4 +218,7 @@ struct digest_item *digest_list_add(u8 *digest, enum hash_algo algo,
 				    const char *label);
 void digest_list_del(u8 *digest, enum hash_algo algo, u8 actions,
 		     struct digest_list_item *digest_list);
+
+int digest_list_parse(loff_t size, void *buf, enum ops op, u8 actions,
+		      u8 *digest, enum hash_algo algo, const char *label);
 #endif /*__DIGLIM_INTERNAL_H*/

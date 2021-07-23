@@ -182,3 +182,38 @@ This section introduces the methods requires to manage the three objects
 defined.
 
 .. kernel-doc:: security/integrity/diglim/methods.c
+
+
+Parser
+------
+
+This section introduces the necessary functions to parse a digest list and
+to execute the requested operation.
+
+.. kernel-doc:: security/integrity/diglim/parser.c
+
+The main function is digest_list_parse(), which coordinates the various
+steps required to add or delete a digest list, and has the logic to roll
+back when one of the steps fails.
+
+#. Calls digest_list_validate() to validate the passed buffer containing
+   the digest list to ensure that the format is correct.
+
+#. Calls get_digest_list() to create a new digest_list_item for the add
+   operation, or to retrieve the existing one for the delete operation.
+   get_digest_list() refuses to add digest lists that were previously
+   added and to delete digest lists that weren't previously added. Also,
+   get_digest_list() refuses to delete digest lists if there are actions
+   done at addition time that are not currently being performed (it would
+   guarantee that also deletion is notified to remote verifiers).
+
+#. Calls _digest_list_parse() which takes the created/retrieved
+   struct digest_list_item and adds or delete the digests included in the
+   digest list.
+
+#. If an error occurred, performs a rollback to the previous state, by
+   calling _digest_list_parse() with the opposite operation and the buffer
+   size at the time the error occurred.
+
+#. digest_list_parse() deletes the struct digest_list_item on unsuccessful
+   add or successful delete.
