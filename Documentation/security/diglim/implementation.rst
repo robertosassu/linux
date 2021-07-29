@@ -226,3 +226,19 @@ This section introduces the interfaces in
 ``<securityfs>/integrity/diglim`` necessary to interact with DIGLIM.
 
 .. kernel-doc:: security/integrity/diglim/fs.c
+
+
+Loader
+------
+
+Digest lists should be loaded as soon as possible, before files are
+accessed, so that services like IMA can perform their queries.
+
+The kernel loader implements two methods for loading digest lists at kernel
+initialization time. The first method takes a directory from
+CONFIG_DIGLIM_DIGEST_LISTS_DIR and executes digest_list_read() for each
+file in that directory. The second method, invoked sequentially after the
+first, executes a digest list uploader at CONFIG_DIGLIM_UPLOADER_PATH with
+the following syntax:
+
+<CONFIG_DIGLIM_UPLOADER_PATH> add <CONFIG_DIGLIM_DIGEST_LISTS_DIR>

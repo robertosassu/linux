@@ -288,4 +288,12 @@ static inline void __init add_to_platform_keyring(const char *source,
 {
 }
 #endif
+
+#ifdef CONFIG_DIGLIM
+void __init digest_lists_load(void);
+#else
+static inline void __init digest_lists_load(void)
+{
+}
+#endif
 #endif /*__INTEGRITY_H*/

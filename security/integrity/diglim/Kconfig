@@ -9,3 +9,17 @@ config DIGLIM
 	help
 	  DIGLIM provides reference values for file content and metadata,
 	  that can be used for measurement and appraisal with IMA.
+
+config DIGLIM_DIGEST_LISTS_DIR
+	string "Path of the directory containing digest lists"
+	depends on DIGLIM
+	default "/etc/digest_lists"
+	help
+	  This option defines the path of the directory containing digest lists.
+
+config DIGLIM_UPLOADER_PATH
+	string "Path of the user space digest list uploader"
+	depends on DIGLIM
+	default "/usr/libexec/diglim/upload_digest_lists"
+	help
+	  This option defines the path of the user space digest list uploader.
