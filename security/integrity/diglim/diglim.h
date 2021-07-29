@@ -20,7 +20,7 @@
 #include <linux/audit.h>
 #include <crypto/hash_info.h>
 #include <linux/hash_info.h>
-#include <uapi/linux/diglim.h>
+#include <linux/diglim.h>
 
 #define MAX_DIGEST_SIZE 64
 #define HASH_BITS 10
@@ -86,6 +86,8 @@ static inline unsigned int hash_key(u8 *digest)
 {
 	return (digest[0] | digest[1] << 8) % DIGLIM_HTABLE_SIZE;
 }
+
+extern struct h_table diglim_htable[COMPACT__LAST];
 
 /**
  * get_hdr - get a compact header from a digest list
@@ -200,4 +202,20 @@ static inline u8 *get_digest_ref(struct digest_list_item_ref *ref)
 
 	return ref->digest_list->buf + ref->digest_offset;
 }
+
+struct digest_item *__digest_lookup(u8 *digest, enum hash_algo algo,
+				    enum compact_types type, u16 *modifiers,
+				    u8 *actions);
+struct digest_item *digest_add(u8 *digest, enum hash_algo algo,
+			       enum compact_types type,
+			       struct digest_list_item *digest_list,
+			       loff_t digest_offset, loff_t hdr_offset);
+void digest_del(u8 *digest, enum hash_algo algo, enum compact_types type,
+		struct digest_list_item *digest_list, loff_t digest_offset,
+		loff_t hdr_offset);
+struct digest_item *digest_list_add(u8 *digest, enum hash_algo algo,
+				    loff_t size, u8 *buf, u8 actions,
+				    const char *label);
+void digest_list_del(u8 *digest, enum hash_algo algo, u8 actions,
+		     struct digest_list_item *digest_list);
 #endif /*__DIGLIM_INTERNAL_H*/

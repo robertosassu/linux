@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Digest Lists Integrity Module (DIGLIM)
+#
+config DIGLIM
+	bool "Digest Lists Integrity Module (DIGLIM)"
+	select SECURITYFS
+	select CRYPTO
+	select CRYPTO_HASH_INFO
+	help
+	  DIGLIM provides reference values for file content and metadata,
+	  that can be used for measurement and appraisal with IMA.

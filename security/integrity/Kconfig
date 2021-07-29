@@ -98,5 +98,6 @@ config INTEGRITY_AUDIT
 
 source "security/integrity/ima/Kconfig"
 source "security/integrity/evm/Kconfig"
+source "security/integrity/diglim/Kconfig"
 
 endif   # if INTEGRITY

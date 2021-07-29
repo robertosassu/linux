@@ -173,3 +173,12 @@ header the digest belongs to. For example:
 
 .. kernel-doc:: security/integrity/diglim/diglim.h
    :identifiers: get_digest
+
+
+Methods
+-------
+
+This section introduces the methods requires to manage the three objects
+defined.
+
+.. kernel-doc:: security/integrity/diglim/methods.c
