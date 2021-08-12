@@ -22,6 +22,8 @@
 #include <linux/hash_info.h>
 #include <linux/diglim.h>
 
+#include "../integrity.h"
+
 #define MAX_DIGEST_SIZE 64
 #define HASH_BITS 10
 #define DIGLIM_HTABLE_SIZE (1 << HASH_BITS)
@@ -221,4 +223,8 @@ void digest_list_del(u8 *digest, enum hash_algo algo, u8 actions,
 
 int digest_list_parse(loff_t size, void *buf, enum ops op, u8 actions,
 		      u8 *digest, enum hash_algo algo, const char *label);
+
+int diglim_ima_get_info(struct file *file, u8 *buffer, size_t buffer_len,
+			char *event_name, u8 *digest, size_t digest_len,
+			enum hash_algo *algo, u8 *actions);
 #endif /*__DIGLIM_INTERNAL_H*/
