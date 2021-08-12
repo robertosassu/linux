@@ -217,3 +217,12 @@ back when one of the steps fails.
 
 #. digest_list_parse() deletes the struct digest_list_item on unsuccessful
    add or successful delete.
+
+
+Interfaces
+----------
+
+This section introduces the interfaces in
+``<securityfs>/integrity/diglim`` necessary to interact with DIGLIM.
+
+.. kernel-doc:: security/integrity/diglim/fs.c

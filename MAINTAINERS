@@ -5514,6 +5514,7 @@ F:	Documentation/security/diglim/introduction.rst
 F:	include/linux/diglim.h
 F:	include/uapi/linux/diglim.h
 F:	security/integrity/diglim/diglim.h
+F:	security/integrity/diglim/fs.c
 F:	security/integrity/diglim/ima.c
 F:	security/integrity/diglim/methods.c
 F:	security/integrity/diglim/parser.c

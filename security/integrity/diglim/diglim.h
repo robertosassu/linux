@@ -227,4 +227,6 @@ int digest_list_parse(loff_t size, void *buf, enum ops op, u8 actions,
 int diglim_ima_get_info(struct file *file, u8 *buffer, size_t buffer_len,
 			char *event_name, u8 *digest, size_t digest_len,
 			enum hash_algo *algo, u8 *actions);
+
+ssize_t digest_list_read(struct path *root, char *path, enum ops op);
 #endif /*__DIGLIM_INTERNAL_H*/
