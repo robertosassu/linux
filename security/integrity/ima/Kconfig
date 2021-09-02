@@ -242,6 +242,7 @@ config IMA_APPRAISE_MODSIG
 	depends on IMA_APPRAISE
 	depends on INTEGRITY_ASYMMETRIC_KEYS
 	select PKCS7_MESSAGE_PARSER
+	select PGP_KEY_PARSER
 	select MODULE_SIG_FORMAT
 	default n
 	help
