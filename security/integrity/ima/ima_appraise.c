@@ -472,8 +472,11 @@ int ima_appraise_measurement(enum ima_hooks func,
 	 */
 	if (try_modsig &&
 	    (!xattr_value || xattr_value->type == IMA_XATTR_DIGEST_NG ||
-	     rc == -ENOKEY))
+	     rc == -ENOKEY)) {
 		rc = modsig_verify(func, modsig, &status, &cause);
+		if (!rc)
+			set_bit(IMA_DIGSIG, &iint->atomic_flags);
+	}
 
 	if (!xattr_value && !try_modsig && (file_actions || metadata_actions)) {
 		status = INTEGRITY_PASS;
