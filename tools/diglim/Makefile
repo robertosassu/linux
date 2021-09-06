@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: GPL-2.0
+
+CC := $(CROSS_COMPILE)gcc
+CFLAGS += -O2 -Wall -g -I./ -I$(DESTDIR)/usr/include -ggdb
+
+PROGS := compact_gen
+PROGS_EXTENDED := common.o
+
+all: $(PROGS)
+
+clean:
+	rm -fr $(PROGS) $(PROGS_EXTENDED)
+
+common.o: common.c
+	$(CC) -c $(CFLAGS) $< -o $@
+
+compact_gen: compact_gen.c $(PROGS_EXTENDED)
+	$(CC) $(CFLAGS) $< $(PROGS_EXTENDED) -o $@ $(LDFLAGS) -lcrypto
