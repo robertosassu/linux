@@ -5507,6 +5507,7 @@ M:	Roberto Sassu <roberto.sassu@huawei.com>
 L:	linux-integrity@vger.kernel.org
 S:	Supported
 T:	git://git.kernel.org/pub/scm/linux/kernel/git/zohar/linux-integrity.git
+F:	Documentation/admin-guide/diglim.rst
 F:	Documentation/security/diglim/architecture.rst
 F:	Documentation/security/diglim/implementation.rst
 F:	Documentation/security/diglim/index.rst

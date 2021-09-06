@@ -79,6 +79,7 @@ configure specific aspects of kernel behavior to your liking.
    cputopology
    dell_rbu
    device-mapper/index
+   diglim
    edid
    efi-stub
    ext4
