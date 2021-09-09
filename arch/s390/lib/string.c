@@ -263,8 +263,8 @@ char *strrchr(const char *s, int c)
 
        if (len)
 	       do {
-		       if (s[len] == (char) c)
-			       return (char *) s + len;
+		       if (s[len - 1] == (char) c)
+			       return (char *) s + len - 1;
 	       } while (--len > 0);
        return NULL;
 }
