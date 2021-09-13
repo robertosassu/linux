@@ -5512,6 +5512,7 @@ F:	Documentation/security/diglim/implementation.rst
 F:	Documentation/security/diglim/index.rst
 F:	Documentation/security/diglim/introduction.rst
 F:	Documentation/security/diglim/remote_attestation.rst
+F:	Documentation/security/diglim/tests.rst
 F:	include/linux/diglim.h
 F:	include/uapi/linux/diglim.h
 F:	security/integrity/diglim/diglim.h
@@ -5519,6 +5520,7 @@ F:	security/integrity/diglim/fs.c
 F:	security/integrity/diglim/ima.c
 F:	security/integrity/diglim/methods.c
 F:	security/integrity/diglim/parser.c
+F:	tools/testing/selftests/diglim/
 
 DIOLAN U2C-12 I2C DRIVER
 M:	Guenter Roeck <linux@roeck-us.net>

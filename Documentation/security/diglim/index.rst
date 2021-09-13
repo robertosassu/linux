@@ -11,3 +11,4 @@ Digest Lists Integrity Module (DIGLIM)
    architecture
    implementation
    remote_attestation
+   tests
