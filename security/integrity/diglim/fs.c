@@ -24,6 +24,7 @@
 #include "diglim.h"
 
 #define MAX_DIGEST_LIST_SIZE (64 * 1024 * 1024 - 1)
+#define TMPBUF_SIZE 512
 
 static struct dentry *diglim_dir;
 /**
@@ -37,6 +38,13 @@ static struct dentry *diglim_dir;
  * removed.
  */
 static struct dentry *digest_lists_loaded_dir;
+/**
+ * DOC: digests_count
+ *
+ * digests_count shows the current number of digests stored in the hash
+ * table by type.
+ */
+static struct dentry *digests_count;
 /**
  * DOC: digest_list_label
  *
@@ -73,6 +81,39 @@ static struct dentry *digest_list_add_dentry;
 static struct dentry *digest_list_del_dentry;
 char digest_query[CRYPTO_MAX_ALG_NAME + 1 + IMA_MAX_DIGEST_SIZE * 2 + 1];
 char digest_list_label[NAME_MAX + 1];
+
+static char *types_str[COMPACT__LAST] = {
+	[COMPACT_PARSER] = "Parser",
+	[COMPACT_FILE] = "File",
+	[COMPACT_METADATA] = "Metadata",
+	[COMPACT_DIGEST_LIST] = "Digest list",
+};
+
+static ssize_t diglim_show_htable_len(struct file *filp, char __user *buf,
+				      size_t count, loff_t *ppos)
+{
+	char *tmpbuf;
+	ssize_t ret, len = 0;
+	int i;
+
+	tmpbuf = kmalloc(TMPBUF_SIZE, GFP_KERNEL);
+	if (!tmpbuf)
+		return -ENOMEM;
+
+	for (i = 0; i < COMPACT__LAST; i++)
+		len += scnprintf(tmpbuf + len, TMPBUF_SIZE - len,
+				 "%s digests: %lu\n", types_str[i],
+				 diglim_htable[i].len);
+
+	ret = simple_read_from_buffer(buf, count, ppos, tmpbuf, len);
+	kfree(tmpbuf);
+	return ret;
+}
+
+static const struct file_operations htable_len_ops = {
+	.read = diglim_show_htable_len,
+	.llseek = generic_file_llseek,
+};
 
 static int parse_digest_list_filename(const char *digest_list_filename,
 				      u8 *digest, enum hash_algo *algo)
@@ -779,6 +820,12 @@ static int __init diglim_fs_init(void)
 	if (IS_ERR(digest_lists_loaded_dir))
 		goto out;
 
+	digests_count = securityfs_create_file("digests_count", 0440,
+					       diglim_dir, NULL,
+					       &htable_len_ops);
+	if (IS_ERR(digests_count))
+		goto out;
+
 	digest_list_add_dentry = securityfs_create_file("digest_list_add", 0200,
 						diglim_dir, NULL,
 						&digest_list_upload_ops);
@@ -809,6 +856,7 @@ out:
 	securityfs_remove(digest_list_label_dentry);
 	securityfs_remove(digest_list_del_dentry);
 	securityfs_remove(digest_list_add_dentry);
+	securityfs_remove(digests_count);
 	securityfs_remove(digest_lists_loaded_dir);
 	securityfs_remove(diglim_dir);
 	return -1;
