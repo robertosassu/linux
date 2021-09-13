@@ -10,3 +10,4 @@ Digest Lists Integrity Module (DIGLIM)
    introduction
    architecture
    implementation
+   remote_attestation
