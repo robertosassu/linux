@@ -5,4 +5,4 @@
 
 obj-$(CONFIG_DIGLIM) += diglim.o
 
-diglim-y := methods.o parser.o ima.o fs.o loader.o
+diglim-y := methods.o parser.o ima.o fs.o loader.o hooks.o

@@ -577,6 +577,9 @@ static ssize_t digest_list_write(struct file *file, const char __user *buf,
 	enum hash_algo algo;
 	u8 actions = 0;
 
+	if (diglim_lsm_enabled)
+		actions = *diglim_cred_actions(current_cred());
+
 	/* No partial writes. */
 	result = -EINVAL;
 	if (*ppos != 0)

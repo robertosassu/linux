@@ -12,3 +12,4 @@ Digest Lists Integrity Module (DIGLIM)
    implementation
    remote_attestation
    tests
+   lsm

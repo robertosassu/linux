@@ -21,12 +21,20 @@
 #include <crypto/hash_info.h>
 #include <linux/hash_info.h>
 #include <linux/diglim.h>
+#include <linux/lsm_hooks.h>
 
 #include "../integrity.h"
 
 #define MAX_DIGEST_SIZE 64
 #define HASH_BITS 10
 #define DIGLIM_HTABLE_SIZE (1 << HASH_BITS)
+
+#define FLAG_PARSER_EXEC	0x01
+#define FLAG_PARSER_FILE_ACCESS	0x02
+#define FLAG_PARSER_FILE_ACCESS_DENY	0x04
+
+extern struct lsm_blob_sizes diglim_lsm_blob_sizes;
+extern int diglim_lsm_enabled;
 
 /**
  * struct digest_list_item - a digest list loaded into the kernel
@@ -229,4 +237,23 @@ int diglim_ima_get_info(struct file *file, u8 *buffer, size_t buffer_len,
 			enum hash_algo *algo, u8 *actions);
 
 ssize_t digest_list_read(struct path *root, char *path, enum ops op);
+static inline u8 *diglim_cred_actions(const struct cred *cred)
+{
+	return cred->security + diglim_lsm_blob_sizes.lbs_cred;
+}
+
+static inline u8 *diglim_cred_flags(const struct cred *cred)
+{
+	return diglim_cred_actions(cred) + 1;
+}
+
+static inline u8 *diglim_inode(const struct inode *inode)
+{
+	return inode->i_security + diglim_lsm_blob_sizes.lbs_inode;
+}
+
+static inline u8 *diglim_file(const struct file *file)
+{
+	return file->f_security + diglim_lsm_blob_sizes.lbs_file;
+}
 #endif /*__DIGLIM_INTERNAL_H*/
