@@ -45,6 +45,13 @@ static struct dentry *digest_lists_loaded_dir;
  */
 static struct dentry *digest_list_label_dentry;
 /**
+ * DOC: digest_query
+ *
+ * digest_query allows to write a query in the format <algo>-<digest> and
+ * to obtain all digest lists that include that digest.
+ */
+static struct dentry *digest_query_dentry;
+/**
  * DOC: digest_list_add
  *
  * digest_list_add can be used to upload a digest list and add the digests
@@ -64,6 +71,7 @@ static struct dentry *digest_list_add_dentry;
  * described for digest_list_add.
  */
 static struct dentry *digest_list_del_dentry;
+char digest_query[CRYPTO_MAX_ALG_NAME + 1 + IMA_MAX_DIGEST_SIZE * 2 + 1];
 char digest_list_label[NAME_MAX + 1];
 
 static int parse_digest_list_filename(const char *digest_list_filename,
@@ -263,6 +271,84 @@ static const struct file_operations digest_list_ascii_ops = {
 	.llseek = seq_lseek,
 	.release = seq_release,
 };
+
+/*
+ * *pos is the n-th reference to show among all the references in all digest
+ * items found with the query.
+ */
+static void *digest_query_start(struct seq_file *m, loff_t *pos)
+{
+	struct digest_item *d;
+	u8 digest[IMA_MAX_DIGEST_SIZE];
+	enum hash_algo algo;
+	loff_t count = 0;
+	enum compact_types type = 0;
+	struct digest_list_item_ref *ref;
+	int ret;
+
+	ret = parse_digest_list_filename(digest_query, digest, &algo);
+	if (ret < 0)
+		return NULL;
+
+	for (type = 0; type < COMPACT__LAST; type++) {
+		d = __digest_lookup(digest, algo, type, NULL, NULL);
+		if (!d)
+			continue;
+
+		list_for_each_entry(ref, &d->refs, list) {
+			if (count++ == *pos) {
+				m->private = d;
+				return ref;
+			}
+		}
+	}
+
+	return NULL;
+}
+
+static void *digest_query_next(struct seq_file *m, void *v, loff_t *pos)
+{
+	struct digest_item *d = (struct digest_item *)m->private;
+	struct digest_list_item_ref *cur_ref = (struct digest_list_item_ref *)v;
+	struct digest_list_item_ref *ref;
+
+	(*pos)++;
+
+	list_for_each_entry(ref, &d->refs, list) {
+		if (ref != cur_ref)
+			continue;
+
+		if (!list_is_last(&cur_ref->list, &d->refs))
+			return list_next_entry(cur_ref, list);
+	}
+
+	return NULL;
+}
+
+static void digest_query_stop(struct seq_file *m, void *v)
+{
+}
+
+static int digest_query_show(struct seq_file *m, void *v)
+{
+	struct digest_list_item_ref *ref = (struct digest_list_item_ref *)v;
+	struct digest_list_item *digest_list = ref->digest_list;
+	struct compact_list_hdr *hdr = get_hdr_ref(ref);
+
+	if (!ref->digest_offset) {
+		seq_printf(m, "%s (actions: %d): type: %d, size: %lld\n",
+			   digest_list->label, digest_list->actions,
+			   COMPACT_DIGEST_LIST, digest_list->size);
+		return 0;
+	}
+
+	seq_printf(m,
+		"%s (actions: %d): version: %d, algo: %s, type: %d, modifiers: %d, count: %d, datalen: %d\n",
+		digest_list->label, digest_list->actions, hdr->version,
+		hash_algo_name[hdr->algo], hdr->type, hdr->modifiers,
+		hdr->count, hdr->datalen);
+	return 0;
+}
 
 static int digest_list_get_secfs_files(char *label, u8 *digest,
 				       enum hash_algo algo, enum ops op,
@@ -594,6 +680,94 @@ static const struct file_operations digest_list_label_ops = {
 	.llseek = generic_file_llseek,
 };
 
+static const struct seq_operations digest_query_seqops = {
+	.start = digest_query_start,
+	.next = digest_query_next,
+	.stop = digest_query_stop,
+	.show = digest_query_show,
+};
+
+/*
+ * digest_query_open: sequentialize access to the add/del/query files
+ */
+static int digest_query_open(struct inode *inode, struct file *file)
+{
+	if (test_and_set_bit(0, &flags))
+		return -EBUSY;
+
+	if (file->f_flags & O_WRONLY)
+		return 0;
+
+	return seq_open(file, &digest_query_seqops);
+}
+
+/*
+ * digest_query_write: write digest query (<algo>-<digest>).
+ */
+static ssize_t digest_query_write(struct file *file, const char __user *buf,
+				  size_t datalen, loff_t *ppos)
+{
+	char *sep;
+	int rc, i;
+
+	if (datalen >= sizeof(digest_query))
+		return -EINVAL;
+
+	rc = copy_from_user(digest_query, buf, datalen);
+	if (rc)
+		return -EFAULT;
+
+	sep = strchr(digest_query, '-');
+	if (!sep) {
+		rc = -EINVAL;
+		goto out;
+	}
+
+	*sep = '\0';
+	i = match_string(hash_algo_name, HASH_ALGO__LAST, digest_query);
+	if (i < 0) {
+		rc = -ENOENT;
+		goto out;
+	}
+
+	*sep = '-';
+
+	for (i = 0; i < hash_digest_size[i] * 2; i++) {
+		if (!isxdigit(sep[i + 1])) {
+			rc = -EINVAL;
+			goto out;
+		}
+	}
+out:
+	if (rc < 0) {
+		memset(digest_query, 0, sizeof(digest_query));
+		return rc;
+	}
+
+	return datalen;
+}
+
+/*
+ * digest_query_release - release the query file
+ */
+static int digest_query_release(struct inode *inode, struct file *file)
+{
+	clear_bit(0, &flags);
+
+	if (file->f_flags & O_WRONLY)
+		return 0;
+
+	return seq_release(inode, file);
+}
+
+static const struct file_operations digest_query_ops = {
+	.open = digest_query_open,
+	.write = digest_query_write,
+	.read = seq_read,
+	.release = digest_query_release,
+	.llseek = generic_file_llseek,
+};
+
 static int __init diglim_fs_init(void)
 {
 	diglim_dir = securityfs_create_dir("diglim", integrity_dir);
@@ -623,8 +797,15 @@ static int __init diglim_fs_init(void)
 	if (IS_ERR(digest_list_label_dentry))
 		goto out;
 
+	digest_query_dentry = securityfs_create_file("digest_query", 0600,
+						     diglim_dir, NULL,
+						     &digest_query_ops);
+	if (IS_ERR(digest_query_dentry))
+		goto out;
+
 	return 0;
 out:
+	securityfs_remove(digest_query_dentry);
 	securityfs_remove(digest_list_label_dentry);
 	securityfs_remove(digest_list_del_dentry);
 	securityfs_remove(digest_list_add_dentry);
