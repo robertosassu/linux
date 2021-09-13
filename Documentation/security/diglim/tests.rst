@@ -14,7 +14,12 @@ expected:
 - ``digest_list_add_del_test_file_upload_measured``;
 - ``digest_list_add_del_test_file_upload_measured_chown``;
 - ``digest_list_check_measurement_list_test_file_upload``;
-- ``digest_list_check_measurement_list_test_buffer_upload``.
+- ``digest_list_check_measurement_list_test_buffer_upload``;
+- ``digest_list_add_del_test_parser_upload``;
+- ``digest_list_add_del_test_parser_upload_not_measured``
+- ``digest_list_add_del_test_parser_upload_write``;
+- ``digest_list_add_del_test_parser_upload_read``;
+- ``digest_list_add_del_test_parser_upload_char_dev``.
 
 The tests are in ``tools/testing/selftests/diglim/selftest.c``.
 
@@ -68,3 +73,14 @@ addition.
 
 The ``file_upload`` variant uploads a file, while the ``buffer_upload``
 variant uploads a buffer.
+
+The ``digest_list_add_del_test_parser`` tests verify the correctness of
+DIGLIM LSM. The ``upload`` variant ensures that files opened by the parser
+are evaluated and the actions are copied to the converted digest list. The
+``upload_not_measured`` variant ensures that the IMA measure action is not
+set to the converted digest list if the parser read a file not measured.
+The ``upload_write`` variant ensures that the parser cannot access a file
+concurrently written by another process. The ``upload_read`` variant
+ensures that files being read by the parser cannot be written by other
+processes. Finally, the ``upload_char_dev`` variant ensures that the parser
+cannot access files without measurable content (e.g. character device).

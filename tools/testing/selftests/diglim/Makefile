@@ -7,13 +7,19 @@ LDLIBS += -lpthread
 
 OVERRIDE_TARGETS = 1
 
-TEST_GEN_PROGS = selftest
-TEST_GEN_PROGS_EXTENDED = libcommon.so
+TEST_GEN_PROGS = selftest manage_digest_lists
+TEST_GEN_PROGS_EXTENDED = libcommon.so libcommon.a common.o
 
 include ../lib.mk
 
 $(OUTPUT)/libcommon.so: common.c
 	$(CC) $(CFLAGS) -shared -fPIC $< $(LDLIBS) -o $@
 
+$(OUTPUT)/libcommon.a: common.o
+	ar rcs libcommon.a common.o
+
 $(OUTPUT)/selftest: selftest.c $(TEST_GEN_PROGS_EXTENDED)
-	$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS) -lcommon
+	$(CC) $(CFLAGS) -DOUTPUT=\"$(OUTPUT)\" $< -o $@ $(LDFLAGS) -lcommon
+
+$(OUTPUT)/manage_digest_lists: manage_digest_lists.c $(TEST_GEN_PROGS_EXTENDED)
+	$(CC) $(CFLAGS) -static $< -o $@ $(LDFLAGS) -lcommon
