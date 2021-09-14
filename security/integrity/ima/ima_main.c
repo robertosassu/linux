@@ -208,7 +208,8 @@ static int process_measurement(struct file *file, const struct cred *cred,
 	char *pathbuf = NULL;
 	char filename[NAME_MAX];
 	const char *pathname = NULL;
-	int rc = 0, action, must_appraise = 0;
+	u64 action;
+	int rc = 0, must_appraise = 0;
 	int pcr = CONFIG_IMA_MEASURE_PCR_IDX;
 	struct evm_ima_xattr_data *xattr_value = NULL;
 	struct modsig *modsig = NULL;

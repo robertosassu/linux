@@ -74,7 +74,7 @@ struct ima_rule_opt_list {
 struct ima_rule_entry {
 	struct list_head list;
 	int action;
-	unsigned int flags;
+	u64 flags;
 	enum ima_hooks func;
 	int mask;
 	unsigned long fsmagic;
@@ -702,14 +702,14 @@ static int get_subaction(struct ima_rule_entry *rule, enum ima_hooks func)
  * list when walking it.  Reads are many orders of magnitude more numerous
  * than writes so ima_match_policy() is classical RCU candidate.
  */
-int ima_match_policy(struct user_namespace *mnt_userns, struct inode *inode,
+u64 ima_match_policy(struct user_namespace *mnt_userns, struct inode *inode,
 		     const struct cred *cred, u32 secid, enum ima_hooks func,
 		     int mask, int flags, int *pcr,
 		     struct ima_template_desc **template_desc,
 		     const char *func_data, unsigned int *allowed_algos)
 {
 	struct ima_rule_entry *entry;
-	int action = 0, actmask = flags | (flags << 1);
+	u64 action = 0, actmask = flags | (flags << 1);
 	struct list_head *ima_rules_tmp;
 
 	if (template_desc && !*template_desc)
