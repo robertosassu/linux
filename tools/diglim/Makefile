@@ -3,7 +3,7 @@
 CC := $(CROSS_COMPILE)gcc
 CFLAGS += -O2 -Wall -g -I./ -I$(DESTDIR)/usr/include -ggdb
 
-PROGS := compact_gen
+PROGS := compact_gen rpm_gen
 PROGS_EXTENDED := common.o
 
 all: $(PROGS)
@@ -16,3 +16,6 @@ common.o: common.c
 
 compact_gen: compact_gen.c $(PROGS_EXTENDED)
 	$(CC) $(CFLAGS) $< $(PROGS_EXTENDED) -o $@ $(LDFLAGS) -lcrypto
+
+rpm_gen: rpm_gen.c $(PROGS_EXTENDED)
+	$(CC) $(CFLAGS) $< $(PROGS_EXTENDED) -o $@ $(LDFLAGS) -lrpm -lrpmio
