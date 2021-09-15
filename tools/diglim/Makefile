@@ -3,7 +3,7 @@
 CC := $(CROSS_COMPILE)gcc
 CFLAGS += -O2 -Wall -g -I./ -I$(DESTDIR)/usr/include -ggdb
 
-PROGS := compact_gen rpm_gen upload_digest_lists
+PROGS := compact_gen rpm_gen upload_digest_lists rpm_parser
 PROGS_EXTENDED := common.o
 
 all: $(PROGS)
@@ -22,3 +22,6 @@ rpm_gen: rpm_gen.c $(PROGS_EXTENDED)
 
 upload_digest_lists: upload_digest_lists.c
 	$(CC) $(CFLAGS) -static $< -o $@ $(LDFLAGS)
+
+rpm_parser: rpm_parser.c $(PROGS_EXTENDED)
+	$(CC) $(CFLAGS) -static $< $(PROGS_EXTENDED) -o $@ $(LDFLAGS)
