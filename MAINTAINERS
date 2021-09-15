@@ -5528,6 +5528,7 @@ F:	tools/diglim/common.c
 F:	tools/diglim/common.h
 F:	tools/diglim/compact_gen.c
 F:	tools/diglim/rpm_gen.c
+F:	tools/diglim/upload_digest_lists.c
 F:	tools/testing/selftests/diglim/
 
 DIOLAN U2C-12 I2C DRIVER
