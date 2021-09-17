@@ -198,6 +198,20 @@ void ima_file_free(struct file *file)
 	ima_check_last_writer(iint, inode, file);
 }
 
+static void diglim_file_digest_lookup(struct file *file,
+				      struct integrity_iint_cache *iint,
+				      int action, u16 *modifiers, u8 *actions)
+{
+	if ((file->f_mode & FMODE_CREATED) && !i_size_read(file_inode(file)))
+		return;
+
+	if (!(iint->flags & IMA_COLLECTED))
+		return;
+
+	diglim_digest_get_info(iint->ima_hash->digest, iint->ima_hash->algo,
+			       COMPACT_FILE, modifiers, actions);
+}
+
 static int process_measurement(struct file *file, const struct cred *cred,
 			       u32 secid, char *buf, loff_t size, int mask,
 			       enum ima_hooks func)
@@ -209,6 +223,8 @@ static int process_measurement(struct file *file, const struct cred *cred,
 	char filename[NAME_MAX];
 	const char *pathname = NULL;
 	u64 action;
+	u16 file_modifiers = 0;
+	u8 file_actions = 0;
 	int rc = 0, must_appraise = 0;
 	int pcr = CONFIG_IMA_MEASURE_PCR_IDX;
 	struct evm_ima_xattr_data *xattr_value = NULL;
@@ -343,6 +359,11 @@ static int process_measurement(struct file *file, const struct cred *cred,
 
 	if (!pathbuf)	/* ima_rdwr_violation possibly pre-fetched */
 		pathname = ima_d_path(&file->f_path, &pathbuf, filename);
+
+	if (iint->flags & IMA_USE_DIGLIM_MEASURE ||
+	    iint->flags & IMA_USE_DIGLIM_APPRAISE)
+		diglim_file_digest_lookup(file, iint, action, &file_modifiers,
+					  &file_actions);
 
 	if (rc == 0 && (action & IMA_APPRAISE_SUBMASK)) {
 		rc = ima_check_blacklist(iint, modsig, pcr);
