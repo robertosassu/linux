@@ -429,6 +429,46 @@ enum integrity_status evm_verifyxattr(struct dentry *dentry,
 }
 EXPORT_SYMBOL_GPL(evm_verifyxattr);
 
+/**
+ * evm_get_hash - obtain the EVM digest calculated according to the passed type
+ * @dentry: object the EVM digest is calculated from
+ * @req_xattr_name: requested xattr
+ * @req_xattr_value: requested xattr value
+ * @req_xattr_value_len: requested xattr value length
+ * @type: requested security.evm type
+ * @algo: requested EVM digest algorithm
+ * @digest: the buffer the EVM digest is written to
+ * @digest_len: size of the buffer
+ *
+ * Calculate the EVM digest from metadata according to the passed security.evm
+ * type.
+ *
+ * Returns 0 if the digest has been calculated successfully, a negative value
+ * otherwise.
+ *
+ * This function requires the caller to lock the inode's i_mutex before it
+ * is executed.
+ */
+int evm_get_hash(struct dentry *dentry, const char *req_xattr_name,
+		 const char *req_xattr_value, size_t req_xattr_value_len,
+		 char type, enum hash_algo algo, u8 *digest, size_t digest_len)
+{
+	struct evm_digest evm_digest;
+	int rc;
+
+	if (digest_len < hash_digest_size[algo])
+		return -EINVAL;
+
+	evm_digest.hdr.algo = algo;
+	rc = evm_calc_hash(dentry, req_xattr_name, req_xattr_value,
+			   req_xattr_value_len, type, &evm_digest);
+	if (rc < 0)
+		return rc;
+
+	memcpy(digest, evm_digest.digest, hash_digest_size[algo]);
+	return 0;
+}
+
 /*
  * evm_verify_current_integrity - verify the dentry's metadata integrity
  * @dentry: pointer to the affected dentry

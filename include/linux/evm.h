@@ -11,6 +11,7 @@
 
 #include <linux/integrity.h>
 #include <linux/xattr.h>
+#include <crypto/hash_info.h>
 
 struct integrity_iint_cache;
 
@@ -42,6 +43,10 @@ extern int evm_protected_xattr_if_enabled(const char *req_xattr_name);
 extern int evm_read_protected_xattrs(struct dentry *dentry, u8 *buffer,
 				     int buffer_size, char type,
 				     bool canonical_fmt);
+extern int evm_get_hash(struct dentry *dentry, const char *req_xattr_name,
+			const char *req_xattr_value, size_t req_xattr_value_len,
+			char type, enum hash_algo algo, u8 *digest,
+			size_t digest_len);
 #ifdef CONFIG_FS_POSIX_ACL
 extern int posix_xattr_acl(const char *xattrname);
 #else
@@ -126,6 +131,15 @@ static inline int evm_protected_xattr_if_enabled(const char *req_xattr_name)
 static inline int evm_read_protected_xattrs(struct dentry *dentry, u8 *buffer,
 					    int buffer_size, char type,
 					    bool canonical_fmt)
+{
+	return -EOPNOTSUPP;
+}
+static inline int evm_get_hash(struct dentry *dentry,
+			       const char *req_xattr_name,
+			       const char *req_xattr_value,
+			       size_t req_xattr_value_len, char type,
+			       enum hash_algo algo, u8 *digest,
+			       size_t digest_len)
 {
 	return -EOPNOTSUPP;
 }

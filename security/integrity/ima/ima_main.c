@@ -24,6 +24,7 @@
 #include <linux/slab.h>
 #include <linux/xattr.h>
 #include <linux/ima.h>
+#include <linux/evm.h>
 #include <linux/iversion.h>
 #include <linux/fs.h>
 
@@ -212,6 +213,44 @@ static void diglim_file_digest_lookup(struct file *file,
 			       COMPACT_FILE, modifiers, actions);
 }
 
+static void diglim_metadata_digest_lookup(struct file *file,
+					struct integrity_iint_cache *iint,
+					int action,
+					struct evm_ima_xattr_data *xattr_value,
+					int xattr_len, u16 *modifiers,
+					u8 *actions)
+{
+	u8 digest[IMA_MAX_DIGEST_SIZE];
+	struct evm_xattr fake_ima_xattr;
+	struct evm_ima_xattr_data *ima_xattr = xattr_value;
+	int rc;
+
+	if ((file->f_mode & FMODE_CREATED) && !i_size_read(file_inode(file)))
+		return;
+
+	if (!(iint->flags & IMA_COLLECTED))
+		return;
+
+	if (!xattr_value) {
+		fake_ima_xattr.data.type = IMA_XATTR_DIGEST_NG;
+		fake_ima_xattr.data.data[0] = iint->ima_hash->algo;
+		memcpy(&fake_ima_xattr.data.data[1], iint->ima_hash->digest,
+		       hash_digest_size[iint->ima_hash->algo]);
+		ima_xattr = &fake_ima_xattr.data;
+		xattr_len = 2 + hash_digest_size[iint->ima_hash->algo];
+	}
+
+	rc = evm_get_hash(file_dentry(file), XATTR_NAME_IMA,
+			  (const char *)ima_xattr, xattr_len,
+			  EVM_XATTR_PORTABLE_DIGSIG, iint->ima_hash->algo,
+			  digest, sizeof(digest));
+	if (rc < 0)
+		return;
+
+	diglim_digest_get_info(digest, iint->ima_hash->algo, COMPACT_METADATA,
+			       modifiers, actions);
+}
+
 static int process_measurement(struct file *file, const struct cred *cred,
 			       u32 secid, char *buf, loff_t size, int mask,
 			       enum ima_hooks func)
@@ -223,8 +262,8 @@ static int process_measurement(struct file *file, const struct cred *cred,
 	char filename[NAME_MAX];
 	const char *pathname = NULL;
 	u64 action;
-	u16 file_modifiers = 0;
-	u8 file_actions = 0;
+	u16 file_modifiers = 0, metadata_modifiers = 0;
+	u8 file_actions = 0, metadata_actions = 0;
 	int rc = 0, must_appraise = 0;
 	int pcr = CONFIG_IMA_MEASURE_PCR_IDX;
 	struct evm_ima_xattr_data *xattr_value = NULL;
@@ -361,9 +400,15 @@ static int process_measurement(struct file *file, const struct cred *cred,
 		pathname = ima_d_path(&file->f_path, &pathbuf, filename);
 
 	if (iint->flags & IMA_USE_DIGLIM_MEASURE ||
-	    iint->flags & IMA_USE_DIGLIM_APPRAISE)
+	    iint->flags & IMA_USE_DIGLIM_APPRAISE) {
 		diglim_file_digest_lookup(file, iint, action, &file_modifiers,
 					  &file_actions);
+		inode_lock(inode);
+		diglim_metadata_digest_lookup(file, iint, action, xattr_value,
+					      xattr_len, &metadata_modifiers,
+					      &metadata_actions);
+		inode_unlock(inode);
+	}
 
 	if (rc == 0 && (action & IMA_APPRAISE_SUBMASK)) {
 		rc = ima_check_blacklist(iint, modsig, pcr);
