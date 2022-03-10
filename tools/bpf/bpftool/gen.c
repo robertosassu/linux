@@ -548,6 +548,7 @@ static void codegen_attach_detach(struct bpf_object *obj, const char *obj_name)
 			tp_name = strchr(bpf_program__section_name(prog), '/') + 1;
 			printf("\tint fd = skel_raw_tracepoint_open(\"%s\", prog_fd);\n", tp_name);
 			break;
+		case BPF_PROG_TYPE_LSM:
 		case BPF_PROG_TYPE_TRACING:
 			if (bpf_program__expected_attach_type(prog) == BPF_TRACE_ITER)
 				printf("\tint fd = skel_link_create(prog_fd, 0, BPF_TRACE_ITER);\n");
