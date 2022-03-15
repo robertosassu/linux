@@ -1024,3 +1024,15 @@ static int __init bpf_init(void)
 	return ret;
 }
 fs_initcall(bpf_init);
+
+static struct vfsmount *bpffs_mount __read_mostly;
+
+void __init mount_bpffs(void)
+{
+	if (list_empty(&preload_list))
+		return;
+
+	bpffs_mount = kern_mount(&bpf_fs_type);
+	if (IS_ERR(bpffs_mount))
+		pr_err("bpffs: could not mount!\n");
+}

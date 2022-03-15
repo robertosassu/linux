@@ -1076,6 +1076,14 @@ struct bpf_struct_ops {
 	u32 value_id;
 };
 
+#ifdef CONFIG_BPF_SYSCALL
+void __init mount_bpffs(void);
+#else
+static inline void __init mount_bpffs(void)
+{
+}
+
+#endif
 #if defined(CONFIG_BPF_JIT) && defined(CONFIG_BPF_SYSCALL)
 #define BPF_MODULE_OWNER ((void *)((0xeB9FUL << 2) + POISON_POINTER_DELTA))
 const struct bpf_struct_ops *bpf_struct_ops_find(u32 type_id);
