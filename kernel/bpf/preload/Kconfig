@@ -25,9 +25,16 @@ config BPF_PRELOAD_UMD
 	  files that are useful in debugging and introspection of BPF programs
 	  and maps.
 
+config BPF_DIGLIM
+	tristate "DIGLIM kernel module"
+	default m
+	help
+	  This builds the diglim_kern kernel module with the DIGLIM eBPF
+	  program.
+
 config BPF_PRELOAD_LIST
 	string "Ordered list of eBPF programs to preload"
-	default "bpf_preload"
+	default "bpf_preload,diglim_kern"
 	help
 	  A comma-separated list of eBPF programs to preload. Any eBPF program
 	  left off this list will be ignored. This can be controlled at boot
