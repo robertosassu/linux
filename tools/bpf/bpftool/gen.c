@@ -1682,6 +1682,116 @@ static void codegen_preload_free(struct bpf_object *obj, const char *obj_name)
 			     "bpf_preload" : obj_name);
 }
 
+static void codegen_preload(struct bpf_object *obj, const char *obj_name)
+{
+	struct bpf_program *prog;
+	const char *link_name;
+	struct bpf_map *map;
+	char ident[256];
+
+	codegen("\
+		\n\
+		\n\
+		static int preload(struct dentry *parent)		    \n\
+		{							    \n\
+			int err;					    \n\
+		\n\
+		");
+
+	bpf_object__for_each_program(prog, obj) {
+		codegen("\
+			\n\
+				bpf_link_inc(%s_link);			    \n\
+			", bpf_program__name(prog));
+	}
+
+	bpf_object__for_each_map(map, obj) {
+		if (!get_map_ident(map, ident, sizeof(ident)))
+			continue;
+
+		if (bpf_map__is_internal(map))
+			continue;
+
+		codegen("\
+			\n\
+				bpf_map_inc(%s_map);			    \n\
+			", ident);
+	}
+
+	bpf_object__for_each_program(prog, obj) {
+		link_name = bpf_program__name(prog);
+		/* These need to be hardcoded for compatibility reasons. */
+		if (!strcmp(obj_name, "iterators_bpf")) {
+			if (!strcmp(link_name, "dump_bpf_map"))
+				link_name = "maps.debug";
+			else if (!strcmp(link_name, "dump_bpf_prog"))
+				link_name = "progs.debug";
+		}
+
+		codegen("\
+			\n\
+			\n\
+				err = bpf_obj_do_pin_kernel(parent, \"%s\",	\n\
+							    %s_link,		\n\
+							    BPF_TYPE_LINK);	\n\
+				if (err)					\n\
+					goto undo;				\n\
+			", link_name, bpf_program__name(prog));
+	}
+
+	bpf_object__for_each_map(map, obj) {
+		if (!get_map_ident(map, ident, sizeof(ident)))
+			continue;
+
+		if (bpf_map__is_internal(map))
+			continue;
+
+		codegen("\
+			\n\
+			\n\
+				err = bpf_obj_do_pin_kernel(parent, \"%1$s\",	\n\
+							    %1$s_map,		\n\
+							    BPF_TYPE_MAP);	\n\
+				if (err)					\n\
+					goto undo;				\n\
+			", ident);
+	}
+
+	codegen("\
+		\n\
+		\n\
+			return 0;					    \n\
+		undo:							    \n\
+		");
+
+	bpf_object__for_each_program(prog, obj) {
+		codegen("\
+			\n\
+				bpf_link_put(%s_link);			    \n\
+			", bpf_program__name(prog));
+	}
+
+
+	bpf_object__for_each_map(map, obj) {
+		if (!get_map_ident(map, ident, sizeof(ident)))
+			continue;
+
+		if (bpf_map__is_internal(map))
+			continue;
+
+		codegen("\
+			\n\
+				bpf_map_put(%s_map);			    \n\
+			", ident);
+	}
+
+	codegen("\
+		\n\
+			return err;					    \n\
+		}							    \n\
+		");
+}
+
 static int do_module(int argc, char **argv)
 {
 	const char *obj_file, *skeleton_file;
@@ -1774,6 +1884,7 @@ static int do_module(int argc, char **argv)
 
 	codegen_preload_vars(obj, obj_name);
 	codegen_preload_free(obj, obj_name);
+	codegen_preload(obj, obj_name);
 
 out:
 	bpf_object__close(obj);
