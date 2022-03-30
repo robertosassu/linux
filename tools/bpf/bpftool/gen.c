@@ -1804,6 +1804,93 @@ static void codegen_preload_ops(void)
 		");
 }
 
+static void codegen_preload_load(struct bpf_object *obj, const char *obj_name)
+{
+	struct bpf_program *prog;
+	struct bpf_map *map;
+	char ident[256];
+
+	codegen("\
+		\n\
+		\n\
+		static int load_skel(void)				    \n\
+		{							    \n\
+			int err = -ENOMEM;				    \n\
+		\n\
+			if (!bpf_preload_set_ops(\"%2$s\", THIS_MODULE, &ops))	\n\
+				return 0;				    \n\
+		\n\
+			skel = %1$s__open();				    \n\
+			if (!skel)					    \n\
+				goto out;				    \n\
+		\n\
+			err = %1$s__load(skel);				    \n\
+			if (err)					    \n\
+				goto out;				    \n\
+		\n\
+			err = %1$s__attach(skel);			    \n\
+			if (err)					    \n\
+				goto out;				    \n\
+		", obj_name, !strcmp(obj_name, "iterators_bpf") ?
+			     "bpf_preload" : obj_name);
+
+	bpf_object__for_each_program(prog, obj) {
+		codegen("\
+			\n\
+			\n\
+				%1$s_link = bpf_link_get_from_fd(skel->links.%1$s_fd);		\n\
+				if (IS_ERR(%1$s_link)) {					\n\
+					err = PTR_ERR(%1$s_link);				\n\
+					goto out;						\n\
+				}								\n\
+			", bpf_program__name(prog));
+	}
+
+	bpf_object__for_each_map(map, obj) {
+		if (!get_map_ident(map, ident, sizeof(ident)))
+			continue;
+
+		if (bpf_map__is_internal(map))
+			continue;
+
+		codegen("\
+			\n\
+			\n\
+				%1$s_map = bpf_map_get(skel->maps.%1$s.map_fd);			\n\
+				if (IS_ERR(%1$s_map)) {						\n\
+					err = PTR_ERR(%1$s_map);				\n\
+					goto out;						\n\
+				}								\n\
+			", ident);
+	}
+
+	codegen("\
+		\n\
+		\n\
+			/* Avoid taking over stdin/stdout/stderr of init process. Zeroing out	\n\
+			 * makes skel_closenz() a no-op later in iterators_bpf__destroy().	\n\
+			 */									\n\
+		");
+
+	bpf_object__for_each_program(prog, obj) {
+		codegen("\
+			\n\
+				close_fd(skel->links.%1$s_fd);		    \n\
+				skel->links.%1$s_fd = 0;		    \n\
+			", bpf_program__name(prog));
+	}
+
+	codegen("\
+		\n\
+		\n\
+			return 0;					    \n\
+		out:							    \n\
+			free_objs_and_skel();				    \n\
+			return err;					    \n\
+		}							    \n\
+		");
+}
+
 static int do_module(int argc, char **argv)
 {
 	const char *obj_file, *skeleton_file;
@@ -1898,6 +1985,7 @@ static int do_module(int argc, char **argv)
 	codegen_preload_free(obj, obj_name);
 	codegen_preload(obj, obj_name);
 	codegen_preload_ops();
+	codegen_preload_load(obj, obj_name);
 
 out:
 	bpf_object__close(obj);
