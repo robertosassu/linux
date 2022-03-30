@@ -27,6 +27,7 @@ GEN COMMANDS
 |	**bpftool** **gen skeleton** *FILE* [**name** *OBJECT_NAME*]
 |	**bpftool** **gen subskeleton** *FILE* [**name** *OBJECT_NAME*]
 |	**bpftool** **gen min_core_btf** *INPUT* *OUTPUT* *OBJECT* [*OBJECT*...]
+|	**bpftool** **gen module** *OBJ_FILE* *SKELETON_FILE* [**name** *OBJECT_NAME*]
 |	**bpftool** **gen help**
 
 DESCRIPTION
@@ -194,6 +195,10 @@ DESCRIPTION
 		  application portable to different kernel versions.
 
 		  Check examples bellow for more information how to use it.
+
+	**bpftool** **gen module** *OBJ_FILE* *SKELETON_FILE* [**name** *OBJECT_NAME*]
+		  Generate the code of a kernel module to preload an eBPF
+		  program and pin its objects.
 
 	**bpftool gen help**
 		  Print short help message.
