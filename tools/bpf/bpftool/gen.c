@@ -1987,6 +1987,14 @@ static int do_module(int argc, char **argv)
 	codegen_preload_ops();
 	codegen_preload_load(obj, obj_name);
 
+	codegen("\
+		\n\
+		\n\
+		late_initcall(load_skel);				    \n\
+		module_exit(free_objs_and_skel);			    \n\
+		MODULE_LICENSE(\"GPL\");				    \n\
+		", skeleton_file);
+
 out:
 	bpf_object__close(obj);
 	if (obj_data)
