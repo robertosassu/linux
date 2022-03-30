@@ -35,11 +35,15 @@ endif
 
 .PHONY: all clean
 
-all: iterators.lskel.h
+all: iterators.lskel.h bpf_preload_kern.c
 
 clean:
 	$(call msg,CLEAN)
 	$(Q)rm -rf $(OUTPUT) iterators
+
+bpf_preload_kern.c: iterators.lskel.h $(OUTPUT)/iterators.bpf.o $(BPFTOOL)
+	$(call msg,GEN-PRELOAD,$@)
+	$(Q)$(BPFTOOL) gen module $(OUTPUT)/iterators.bpf.o iterators/$< > ../$@
 
 iterators.lskel.h: $(OUTPUT)/iterators.bpf.o | $(BPFTOOL)
 	$(call msg,GEN-SKEL,$@)
