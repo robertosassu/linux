@@ -1792,6 +1792,18 @@ static void codegen_preload(struct bpf_object *obj, const char *obj_name)
 		");
 }
 
+static void codegen_preload_ops(void)
+{
+	codegen("\
+		\n\
+		\n\
+		static struct bpf_preload_ops ops = {			    \n\
+			.preload = preload,				    \n\
+			.owner = THIS_MODULE,				    \n\
+		};							    \n\
+		");
+}
+
 static int do_module(int argc, char **argv)
 {
 	const char *obj_file, *skeleton_file;
@@ -1885,6 +1897,7 @@ static int do_module(int argc, char **argv)
 	codegen_preload_vars(obj, obj_name);
 	codegen_preload_free(obj, obj_name);
 	codegen_preload(obj, obj_name);
+	codegen_preload_ops();
 
 out:
 	bpf_object__close(obj);
