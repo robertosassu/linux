@@ -16,6 +16,8 @@
 #include <linux/bpf_local_storage.h>
 #include <linux/btf_ids.h>
 #include <linux/ima.h>
+#include <linux/verification.h>
+#include <linux/module_signature.h>
 
 /* For every LSM hook that allows attachment of BPF programs, declare a nop
  * function where a BPF program can be attached.
@@ -117,6 +119,69 @@ static const struct bpf_func_proto bpf_ima_file_hash_proto = {
 	.allowed	= bpf_ima_inode_hash_allowed,
 };
 
+BPF_CALL_2(bpf_mod_verify_sig, const void *, mod, size_t, modlen)
+{
+	const size_t marker_len = strlen(MODULE_SIG_STRING);
+	struct module_signature ms;
+	size_t sig_len;
+	u8 saved_id_type;
+	int ret;
+
+	pr_devel("==>%s(,%zu)\n", __func__, modlen);
+
+	if (modlen <= marker_len)
+		return -ENOENT;
+
+	if (memcmp(mod + modlen - marker_len, MODULE_SIG_STRING, marker_len))
+		return -ENOENT;
+
+	modlen -= marker_len;
+
+	if (modlen <= sizeof(ms))
+		return -EBADMSG;
+
+	memcpy(&ms, mod + (modlen - sizeof(ms)), sizeof(ms));
+
+	saved_id_type = ms.id_type;
+	ms.id_type = PKEY_ID_PKCS7;
+
+	ret = mod_check_sig(&ms, modlen, "bpf_data");
+	if (ret)
+		return ret;
+
+	sig_len = be32_to_cpu(ms.sig_len);
+	modlen -= sig_len + sizeof(ms);
+
+	switch (saved_id_type) {
+	case PKEY_ID_PKCS7:
+		ret = verify_pkcs7_signature(mod, modlen, mod + modlen, sig_len,
+					     VERIFY_USE_SECONDARY_KEYRING,
+					     VERIFYING_MODULE_SIGNATURE,
+					     NULL, NULL);
+		break;
+	case PKEY_ID_PGP:
+		ret = verify_pgp_signature(mod, modlen, mod + modlen, sig_len,
+					   VERIFY_USE_SECONDARY_KEYRING,
+					   VERIFYING_MODULE_SIGNATURE,
+					   NULL, NULL);
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	return (ret < 0) ? ret : modlen;
+}
+EXPORT_SYMBOL_GPL(bpf_mod_verify_sig);
+
+static const struct bpf_func_proto bpf_mod_verify_sig_proto = {
+	.func		= bpf_mod_verify_sig,
+	.gpl_only	= false,
+	.ret_type	= RET_INTEGER,
+	.arg1_type	= ARG_PTR_TO_MEM,
+	.arg2_type	= ARG_CONST_SIZE_OR_ZERO,
+	.allowed	= bpf_ima_inode_hash_allowed,
+};
+
 static const struct bpf_func_proto *
 bpf_lsm_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 {
@@ -141,6 +206,8 @@ bpf_lsm_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 		return prog->aux->sleepable ? &bpf_ima_inode_hash_proto : NULL;
 	case BPF_FUNC_ima_file_hash:
 		return prog->aux->sleepable ? &bpf_ima_file_hash_proto : NULL;
+	case BPF_FUNC_mod_verify_sig:
+		return prog->aux->sleepable ? &bpf_mod_verify_sig_proto : NULL;
 	default:
 		return tracing_prog_func_proto(func_id, prog);
 	}

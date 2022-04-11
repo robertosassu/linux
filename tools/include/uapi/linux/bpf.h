@@ -5149,6 +5149,13 @@ union bpf_attr {
  *		Compares *map* with the map retrieved from *ufd*.
  *	Return
  *		1 if the two maps are the same, 0 if they are different.
+ *
+ * long bpf_mod_verify_sig(const void *mod, size_t modlen)
+ *	Description
+ *		Verify the module-style signature of *mod* with size *modlen*.
+ *	Return
+ *		The size of verified data if verification succeeded, a negative
+ *		value otherwise.
  */
 #define __BPF_FUNC_MAPPER(FN)		\
 	FN(unspec),			\
@@ -5346,6 +5353,7 @@ union bpf_attr {
 	FN(skb_set_tstamp),		\
 	FN(ima_file_hash),		\
 	FN(map_same),			\
+	FN(mod_verify_sig),		\
 	/* */
 
 /* integer value in 'imm' field of BPF_CALL instruction selects which helper
