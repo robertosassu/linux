@@ -119,6 +119,28 @@ const struct bpf_func_proto bpf_map_peek_elem_proto = {
 	.arg2_type	= ARG_PTR_TO_UNINIT_MAP_VALUE,
 };
 
+BPF_CALL_2(bpf_map_same, struct bpf_map *, map, int, ufd)
+{
+	struct bpf_map *ufd_map;
+	int same = 0;
+	struct fd f;
+
+	f = fdget(ufd);
+	ufd_map = __bpf_map_get(f);
+	same = (map == ufd_map);
+	fdput(f);
+
+	return same;
+}
+
+const struct bpf_func_proto bpf_map_same_proto = {
+	.func		= bpf_map_same,
+	.gpl_only	= false,
+	.ret_type	= RET_INTEGER,
+	.arg1_type	= ARG_CONST_MAP_PTR,
+	.arg2_type	= ARG_ANYTHING,
+};
+
 const struct bpf_func_proto bpf_get_prandom_u32_proto = {
 	.func		= bpf_user_rnd_u32,
 	.gpl_only	= false,
@@ -1398,6 +1420,8 @@ bpf_base_func_proto(enum bpf_func_id func_id)
 		return &bpf_map_pop_elem_proto;
 	case BPF_FUNC_map_peek_elem:
 		return &bpf_map_peek_elem_proto;
+	case BPF_FUNC_map_same:
+		return &bpf_map_same_proto;
 	case BPF_FUNC_get_prandom_u32:
 		return &bpf_get_prandom_u32_proto;
 	case BPF_FUNC_get_smp_processor_id:

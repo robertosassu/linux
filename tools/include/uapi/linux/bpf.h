@@ -5143,6 +5143,12 @@ union bpf_attr {
  *		The **hash_algo** is returned on success,
  *		**-EOPNOTSUP** if the hash calculation failed or **-EINVAL** if
  *		invalid arguments are passed.
+ *
+ * long bpf_map_same(struct bpf_map *map, int ufd)
+ *	Description
+ *		Compares *map* with the map retrieved from *ufd*.
+ *	Return
+ *		1 if the two maps are the same, 0 if they are different.
  */
 #define __BPF_FUNC_MAPPER(FN)		\
 	FN(unspec),			\
@@ -5339,6 +5345,7 @@ union bpf_attr {
 	FN(copy_from_user_task),	\
 	FN(skb_set_tstamp),		\
 	FN(ima_file_hash),		\
+	FN(map_same),			\
 	/* */
 
 /* integer value in 'imm' field of BPF_CALL instruction selects which helper
