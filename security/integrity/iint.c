@@ -211,6 +211,8 @@ void __init integrity_load_keys(void)
 
 	if (!IS_ENABLED(CONFIG_IMA_LOAD_X509))
 		evm_load_x509();
+
+	call_blocking_lsm_notifier(IMA_READY, NULL);
 }
 
 static int __init integrity_fs_init(void)

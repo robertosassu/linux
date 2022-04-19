@@ -77,6 +77,7 @@ struct timezone;
 
 enum lsm_event {
 	LSM_POLICY_CHANGE,
+	IMA_READY,
 };
 
 /*
