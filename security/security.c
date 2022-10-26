@@ -30,7 +30,11 @@
 #include <linux/msg.h>
 #include <net/flow.h>
 
-#define MAX_LSM_EVM_XATTR	2
+#define MAX_LSM_EVM_XATTR                                \
+	((IS_ENABLED(CONFIG_EVM) ? 1 : 0) +              \
+	 (IS_ENABLED(CONFIG_SECURITY_SELINUX) ? 1 : 0) + \
+	 (IS_ENABLED(CONFIG_SECURITY_SMACK) ? 1 : 0) +   \
+	 (IS_ENABLED(CONFIG_BPF_LSM) ? 1 : 0))
 
 /* How many LSMs were built into the kernel? */
 #define LSM_COUNT (__end_lsm_info - __start_lsm_info)
@@ -1093,9 +1097,12 @@ int security_inode_init_security(struct inode *inode, struct inode *dir,
 				 const struct qstr *qstr,
 				 const initxattrs initxattrs, void *fs_data)
 {
+	int i = 0;
+	int ret = -EOPNOTSUPP;
 	struct xattr new_xattrs[MAX_LSM_EVM_XATTR + 1];
 	struct xattr *lsm_xattr, *evm_xattr, *xattr;
-	int ret;
+	struct security_hook_list *hook_ptr;
+	bool new_xattrs_set = false;
 
 	if (unlikely(IS_PRIVATE(inode)))
 		return 0;
@@ -1105,15 +1112,31 @@ int security_inode_init_security(struct inode *inode, struct inode *dir,
 				     dir, qstr, NULL, NULL, NULL);
 	memset(new_xattrs, 0, sizeof(new_xattrs));
 	lsm_xattr = new_xattrs;
-	ret = call_int_hook(inode_init_security, -EOPNOTSUPP, inode, dir, qstr,
-						&lsm_xattr->name,
-						&lsm_xattr->value,
-						&lsm_xattr->value_len);
-	if (ret)
+	hlist_for_each_entry(hook_ptr, &security_hook_heads.inode_init_security,
+			     list) {
+		ret = hook_ptr->hook.inode_init_security(inode, dir, qstr,
+				&lsm_xattr->name,
+				&lsm_xattr->value,
+				&lsm_xattr->value_len);
+		if (ret == -EOPNOTSUPP)
+			continue;
+		if (WARN_ON_ONCE(i >= MAX_LSM_EVM_XATTR))
+			ret = -ENOMEM;
+		if (ret != 0)
+			goto out;
+		if (WARN_ON_ONCE(!lsm_xattr->name || !lsm_xattr->value)) {
+			ret = -ENOMEM;
+			goto out;
+		}
+		lsm_xattr++;
+		i++;
+		new_xattrs_set = true;
+	}
+	if (!new_xattrs_set)
 		goto out;
 
-	evm_xattr = lsm_xattr + 1;
-	ret = evm_inode_init_security(inode, lsm_xattr, evm_xattr);
+	evm_xattr = lsm_xattr;
+	ret = evm_inode_init_security(inode, new_xattrs, evm_xattr);
 	if (ret)
 		goto out;
 	ret = initxattrs(inode, new_xattrs, fs_data);

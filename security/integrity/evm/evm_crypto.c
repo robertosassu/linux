@@ -385,7 +385,7 @@ int evm_update_evmxattr(struct dentry *dentry, const char *xattr_name,
 	return rc;
 }
 
-int evm_init_hmac(struct inode *inode, const struct xattr *lsm_xattr,
+int evm_init_hmac(struct inode *inode, const struct xattr *lsm_xattrs,
 		  char *hmac_val)
 {
 	struct shash_desc *desc;
@@ -396,7 +396,12 @@ int evm_init_hmac(struct inode *inode, const struct xattr *lsm_xattr,
 		return PTR_ERR(desc);
 	}
 
-	crypto_shash_update(desc, lsm_xattr->value, lsm_xattr->value_len);
+	for (int i = 0; lsm_xattrs[i].value != NULL; i++) {
+		if (evm_protected_xattr(lsm_xattrs[i].name))
+			crypto_shash_update(desc,
+					    lsm_xattrs[i].value,
+					    lsm_xattrs[i].value_len);
+	}
 	hmac_add_misc(desc, inode, EVM_XATTR_HMAC, hmac_val);
 	kfree(desc);
 	return 0;
