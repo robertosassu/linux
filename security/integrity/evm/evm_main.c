@@ -174,6 +174,7 @@ static enum integrity_status evm_verify_hmac(struct dentry *dentry,
 	struct signature_v2_hdr *hdr;
 	enum integrity_status evm_status = INTEGRITY_PASS;
 	struct evm_digest digest;
+	struct evm_digest *digest_ptr = &digest;
 	struct inode *inode;
 	int rc, xattr_len, evm_immutable = 0;
 
@@ -231,14 +232,26 @@ static enum integrity_status evm_verify_hmac(struct dentry *dentry,
 		}
 
 		hdr = (struct signature_v2_hdr *)xattr_data;
-		digest.hdr.algo = hdr->hash_algo;
+
+		if (IS_ENABLED(CONFIG_VMAP_STACK)) {
+			digest_ptr = kmalloc(sizeof(*digest_ptr), GFP_NOFS);
+			if (!digest_ptr) {
+				rc = -ENOMEM;
+				break;
+			}
+		}
+
+		digest_ptr->hdr.algo = hdr->hash_algo;
+
 		rc = evm_calc_hash(dentry, xattr_name, xattr_value,
-				   xattr_value_len, xattr_data->type, &digest);
+				   xattr_value_len, xattr_data->type,
+				   digest_ptr);
 		if (rc)
 			break;
 		rc = integrity_digsig_verify(INTEGRITY_KEYRING_EVM,
 					(const char *)xattr_data, xattr_len,
-					digest.digest, digest.hdr.length);
+					digest_ptr->digest,
+					digest_ptr->hdr.length);
 		if (!rc) {
 			inode = d_backing_inode(dentry);
 
@@ -259,6 +272,9 @@ static enum integrity_status evm_verify_hmac(struct dentry *dentry,
 		rc = -EINVAL;
 		break;
 	}
+
+	if (digest_ptr && digest_ptr != &digest)
+		kfree(digest_ptr);
 
 	if (rc) {
 		if (rc == -ENODATA)
