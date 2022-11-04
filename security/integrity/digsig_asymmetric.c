@@ -122,11 +122,26 @@ int asymmetric_verify(struct key *keyring, const char *sig,
 		goto out;
 	}
 
-	pks.digest = (u8 *)data;
+	pks.digest = kmemdup(data, datalen, GFP_KERNEL);
+	if (!pks.digest) {
+		ret = -ENOMEM;
+		goto out;
+	}
+
 	pks.digest_size = datalen;
-	pks.s = hdr->sig;
+
+	pks.s = kmemdup(hdr->sig, siglen, GFP_KERNEL);
+	if (!pks.s) {
+		kfree(pks.digest);
+		ret = -ENOMEM;
+		goto out;
+	}
+
 	pks.s_size = siglen;
+
 	ret = verify_signature(key, &pks);
+	kfree(pks.digest);
+	kfree(pks.s);
 out:
 	key_put(key);
 	pr_debug("%s() = %d\n", __func__, ret);
