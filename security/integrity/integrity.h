@@ -188,6 +188,7 @@ int integrity_kernel_read(struct file *file, loff_t offset,
 #define INTEGRITY_KEYRING_MAX		4
 
 extern struct dentry *integrity_dir;
+extern struct lsm_blob_sizes integrity_blob_sizes;
 
 struct modsig;
 
@@ -195,6 +196,15 @@ struct modsig;
 int __init init_ima_lsm(void);
 #else
 static inline int __init init_ima_lsm(void)
+{
+	return 0;
+}
+#endif
+
+#ifdef CONFIG_EVM
+int __init init_evm_lsm(void);
+#else
+static inline int __init init_evm_lsm(void)
 {
 	return 0;
 }
