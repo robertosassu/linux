@@ -406,6 +406,7 @@
  *	call to notify_change is performed from several locations, whenever
  *	file attributes change (such as when a file is truncated, chown/chmod
  *	operations, transferring disk quotas, etc).
+ *	@mnt_userns contains the user namespace of the mount.
  *	@dentry contains the dentry structure for the file.
  *	@attr is the iattr structure containing the new file attributes.
  *	Return 0 if permission is granted.
