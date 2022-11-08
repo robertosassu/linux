@@ -19,6 +19,7 @@
 #include <linux/xattr.h>
 #include <linux/integrity.h>
 #include <linux/evm.h>
+#include <linux/lsm_hooks.h>
 #include <linux/magic.h>
 #include <linux/posix_acl_xattr.h>
 
@@ -28,6 +29,7 @@
 #include "evm.h"
 
 int evm_initialized;
+static int evm_enabled;
 
 static const char * const integrity_status_msg[] = {
 	"pass", "pass_immutable", "fail", "fail_immutable", "no_label",
@@ -566,9 +568,10 @@ out:
  * userspace from writing HMAC value.  Writing 'security.evm' requires
  * requires CAP_SYS_ADMIN privileges.
  */
-int evm_inode_setxattr(struct user_namespace *mnt_userns, struct dentry *dentry,
-		       const char *xattr_name, const void *xattr_value,
-		       size_t xattr_value_len, int flags)
+static int evm_inode_setxattr(struct user_namespace *mnt_userns,
+			      struct dentry *dentry, const char *xattr_name,
+			      const void *xattr_value, size_t xattr_value_len,
+			      int flags)
 {
 	const struct evm_ima_xattr_data *xattr_data = xattr_value;
 
@@ -598,8 +601,8 @@ int evm_inode_setxattr(struct user_namespace *mnt_userns, struct dentry *dentry,
  * Removing 'security.evm' requires CAP_SYS_ADMIN privileges and that
  * the current value is valid.
  */
-int evm_inode_removexattr(struct user_namespace *mnt_userns,
-			  struct dentry *dentry, const char *xattr_name)
+static int evm_inode_removexattr(struct user_namespace *mnt_userns,
+				 struct dentry *dentry, const char *xattr_name)
 {
 	/* Policy permits modification of the protected xattrs even though
 	 * there's no HMAC key loaded
@@ -650,8 +653,9 @@ static inline int evm_inode_set_acl_change(struct user_namespace *mnt_userns,
  * and 'security.evm' xattr updated, unless the existing 'security.evm' is
  * valid.
  */
-int evm_inode_set_acl(struct user_namespace *mnt_userns, struct dentry *dentry,
-		      const char *acl_name, struct posix_acl *kacl)
+static int evm_inode_set_acl(struct user_namespace *mnt_userns,
+			     struct dentry *dentry, const char *acl_name,
+			     struct posix_acl *kacl)
 {
 	enum integrity_status evm_status;
 
@@ -688,6 +692,23 @@ int evm_inode_set_acl(struct user_namespace *mnt_userns, struct dentry *dentry,
 				    integrity_status_msg[evm_status],
 				    -EPERM, 0);
 	return -EPERM;
+}
+
+/**
+ * evm_inode_remove_acl - protect the EVM extended attribute from posix acls
+ * @mnt_userns: user namespace of the idmapped mount
+ * @dentry: pointer to the affected dentry
+ * @acl_name: name of the posix acl
+ *
+ * Prevent modifying posix acls causing the EVM HMAC to be re-calculated
+ * and 'security.evm' xattr updated, unless the existing 'security.evm' is
+ * valid.
+ */
+static int evm_inode_remove_acl(struct user_namespace *mnt_userns,
+				struct dentry *dentry,
+				const char *acl_name)
+{
+	return evm_inode_set_acl(mnt_userns, dentry, acl_name, NULL);
 }
 
 static void evm_reset_status(struct inode *inode)
@@ -738,9 +759,11 @@ bool evm_revalidate_status(const char *xattr_name)
  * __vfs_setxattr_noperm().  The caller of which has taken the inode's
  * i_mutex lock.
  */
-void evm_inode_post_setxattr(struct dentry *dentry, const char *xattr_name,
-			     const void *xattr_value, size_t xattr_value_len,
-			     int flags)
+static void evm_inode_post_setxattr(struct dentry *dentry,
+				    const char *xattr_name,
+				    const void *xattr_value,
+				    size_t xattr_value_len,
+				    int flags)
 {
 	if (!evm_revalidate_status(xattr_name))
 		return;
@@ -757,6 +780,22 @@ void evm_inode_post_setxattr(struct dentry *dentry, const char *xattr_name,
 }
 
 /**
+ * evm_inode_post_set_acl - update the EVM extended attribute from posix acls
+ * @dentry: pointer to the affected dentry
+ * @acl_name: name of the posix acl
+ * @kacl: pointer to the posix acls
+ *
+ * Prevent modifying posix acls causing the EVM HMAC to be re-calculated
+ * and 'security.evm' xattr updated, unless the existing 'security.evm' is
+ * valid.
+ */
+static void evm_inode_post_set_acl(struct dentry *dentry, const char *acl_name,
+				   struct posix_acl *kacl)
+{
+	return evm_inode_post_setxattr(dentry, acl_name, NULL, 0, 0);
+}
+
+/**
  * evm_inode_post_removexattr - update 'security.evm' after removing the xattr
  * @dentry: pointer to the affected dentry
  * @xattr_name: pointer to the affected extended attribute name
@@ -766,7 +805,8 @@ void evm_inode_post_setxattr(struct dentry *dentry, const char *xattr_name,
  * No need to take the i_mutex lock here, as this function is called from
  * vfs_removexattr() which takes the i_mutex.
  */
-void evm_inode_post_removexattr(struct dentry *dentry, const char *xattr_name)
+static void evm_inode_post_removexattr(struct dentry *dentry,
+				       const char *xattr_name)
 {
 	if (!evm_revalidate_status(xattr_name))
 		return;
@@ -780,6 +820,21 @@ void evm_inode_post_removexattr(struct dentry *dentry, const char *xattr_name)
 		return;
 
 	evm_update_evmxattr(dentry, xattr_name, NULL, 0);
+}
+
+/**
+ * evm_inode_post_remove_acl - update the EVM extended attribute from posix acls
+ * @dentry: pointer to the affected dentry
+ * @acl_name: name of the posix acl
+ *
+ * Prevent modifying posix acls causing the EVM HMAC to be re-calculated
+ * and 'security.evm' xattr updated, unless the existing 'security.evm' is
+ * valid.
+ */
+static inline void evm_inode_post_remove_acl(struct dentry *dentry,
+					     const char *acl_name)
+{
+	evm_inode_post_removexattr(dentry, acl_name);
 }
 
 static int evm_attr_change(struct user_namespace *mnt_userns,
@@ -805,8 +860,8 @@ static int evm_attr_change(struct user_namespace *mnt_userns,
  * Permit update of file attributes when files have a valid EVM signature,
  * except in the case of them having an immutable portable signature.
  */
-int evm_inode_setattr(struct user_namespace *mnt_userns, struct dentry *dentry,
-		      struct iattr *attr)
+static int evm_inode_setattr(struct user_namespace *mnt_userns,
+			     struct dentry *dentry, struct iattr *attr)
 {
 	unsigned int ia_valid = attr->ia_valid;
 	enum integrity_status evm_status;
@@ -853,8 +908,8 @@ int evm_inode_setattr(struct user_namespace *mnt_userns, struct dentry *dentry,
  * This function is called from notify_change(), which expects the caller
  * to lock the inode's i_mutex.
  */
-void evm_inode_post_setattr(struct user_namespace *mnt_userns,
-			    struct dentry *dentry, int ia_valid)
+static void evm_inode_post_setattr(struct user_namespace *mnt_userns,
+				   struct dentry *dentry, int ia_valid)
 {
 	if (!evm_revalidate_status(NULL))
 		return;
@@ -892,7 +947,7 @@ int evm_inode_init_security(struct inode *inode, struct inode *dir,
 	if (!evm_protected_xattrs)
 		return -EOPNOTSUPP;
 
-	evm_xattr = xattr;
+	evm_xattr = xattrs + integrity_blob_sizes.lbs_xattr;
 
 	xattr_data = kzalloc(sizeof(*xattr_data), GFP_NOFS);
 	if (!xattr_data)
@@ -929,6 +984,9 @@ static int __init init_evm(void)
 	int error;
 	struct list_head *pos, *q;
 
+	if (!evm_enabled)
+		return 0;
+
 	evm_init_config();
 
 	error = integrity_init_keyring(INTEGRITY_KEYRING_EVM);
@@ -950,6 +1008,26 @@ error:
 	}
 
 	return error;
+}
+
+static struct security_hook_list evm_hooks[] __lsm_ro_after_init = {
+	LSM_HOOK_INIT(inode_setattr, evm_inode_setattr),
+	LSM_HOOK_INIT(inode_post_setattr, evm_inode_post_setattr),
+	LSM_HOOK_INIT(inode_setxattr, evm_inode_setxattr),
+	LSM_HOOK_INIT(inode_set_acl, evm_inode_set_acl),
+	LSM_HOOK_INIT(inode_post_set_acl, evm_inode_post_set_acl),
+	LSM_HOOK_INIT(inode_remove_acl, evm_inode_remove_acl),
+	LSM_HOOK_INIT(inode_post_remove_acl, evm_inode_post_remove_acl),
+	LSM_HOOK_INIT(inode_post_setxattr, evm_inode_post_setxattr),
+	LSM_HOOK_INIT(inode_removexattr, evm_inode_removexattr),
+	LSM_HOOK_INIT(inode_post_removexattr, evm_inode_post_removexattr),
+	LSM_HOOK_INIT(inode_init_security, evm_inode_init_security),
+};
+
+void __init init_evm_lsm(void)
+{
+	security_add_hooks(evm_hooks, ARRAY_SIZE(evm_hooks), "integrity");
+	evm_enabled = 1;
 }
 
 late_initcall(init_evm);
