@@ -1435,6 +1435,14 @@ int security_inode_setattr(struct user_namespace *mnt_userns,
 }
 EXPORT_SYMBOL_GPL(security_inode_setattr);
 
+void security_inode_post_setattr(struct user_namespace *mnt_userns,
+				 struct dentry *dentry, int ia_valid)
+{
+	if (unlikely(IS_PRIVATE(d_backing_inode(dentry))))
+		return;
+	call_void_hook(inode_post_setattr, mnt_userns, dentry, ia_valid);
+}
+
 int security_inode_getattr(const struct path *path)
 {
 	if (unlikely(IS_PRIVATE(d_backing_inode(path->dentry))))
