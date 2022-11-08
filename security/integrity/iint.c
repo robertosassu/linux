@@ -180,14 +180,24 @@ static int __init integrity_iintcache_init(void)
 	if (error)
 		return error;
 
+	error = init_evm_lsm();
+	if (error)
+		return error;
+
 	iint_cache =
 	    kmem_cache_create("iint_cache", sizeof(struct integrity_iint_cache),
 			      0, SLAB_PANIC, init_once);
 	return 0;
 }
+
+struct lsm_blob_sizes integrity_blob_sizes __lsm_ro_after_init = {
+	.lbs_xattr = 1,
+};
+
 DEFINE_LSM(integrity) = {
 	.name = "integrity",
 	.init = integrity_iintcache_init,
+	.blobs = &integrity_blob_sizes,
 };
 
 
