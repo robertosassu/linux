@@ -210,6 +210,7 @@ static void __init lsm_set_blob_sizes(struct lsm_blob_sizes *needed)
 	lsm_set_blob_size(&needed->lbs_msg_msg, &blob_sizes.lbs_msg_msg);
 	lsm_set_blob_size(&needed->lbs_superblock, &blob_sizes.lbs_superblock);
 	lsm_set_blob_size(&needed->lbs_task, &blob_sizes.lbs_task);
+	lsm_set_blob_size(&needed->lbs_xattr, &blob_sizes.lbs_xattr);
 }
 
 /* Prepare LSM for initialization. */
@@ -346,6 +347,7 @@ static void __init ordered_lsm_init(void)
 	init_debug("msg_msg blob size    = %d\n", blob_sizes.lbs_msg_msg);
 	init_debug("superblock blob size = %d\n", blob_sizes.lbs_superblock);
 	init_debug("task blob size       = %d\n", blob_sizes.lbs_task);
+	init_debug("xattr slots          = %d\n", blob_sizes.lbs_xattr);
 
 	/*
 	 * Create any kmem_caches needed for blobs
@@ -1100,32 +1102,74 @@ static int security_initxattrs(struct inode *inode, const struct xattr *xattrs,
 	return 0;
 }
 
+static int security_check_compact_xattrs(struct xattr *xattrs,
+					 int num_xattrs, int *checked_xattrs)
+{
+	int i;
+
+	for (i = *checked_xattrs; i < num_xattrs; i++) {
+		if ((!xattrs[i].name && xattrs[i].value) ||
+		    (xattrs[i].name && !xattrs[i].value))
+			return -EINVAL;
+
+		if (!xattrs[i].name)
+			continue;
+
+		if (i == *checked_xattrs) {
+			(*checked_xattrs)++;
+			continue;
+		}
+
+		memcpy(xattrs + (*checked_xattrs)++, xattrs + i,
+		       sizeof(*xattrs));
+		memset(xattrs + i, 0, sizeof(*xattrs));
+	}
+
+	return 0;
+}
+
 int security_inode_init_security(struct inode *inode, struct inode *dir,
 				 const struct qstr *qstr,
 				 const initxattrs initxattrs, void *fs_data)
 {
-	struct xattr new_xattrs[MAX_LSM_EVM_XATTR + 1];
-	struct xattr *lsm_xattr, *evm_xattr, *xattr;
-	int ret;
+	struct security_hook_list *P;
+	struct xattr *new_xattrs;
+	struct xattr *xattr;
+	int ret, cur_xattrs = 0;
 
 	if (unlikely(IS_PRIVATE(inode)))
+		return 0;
+
+	if (!blob_sizes.lbs_xattr)
 		return 0;
 
 	if (!initxattrs ||
 	    (initxattrs == &security_initxattrs && !fs_data))
 		return call_int_hook(inode_init_security, -EOPNOTSUPP, inode,
-				     dir, qstr, NULL, NULL, NULL);
-	memset(new_xattrs, 0, sizeof(new_xattrs));
-	lsm_xattr = new_xattrs;
-	ret = call_int_hook(inode_init_security, -EOPNOTSUPP, inode, dir, qstr,
-						&lsm_xattr->name,
-						&lsm_xattr->value,
-						&lsm_xattr->value_len);
-	if (ret)
-		goto out;
+				     dir, qstr, NULL);
+	/* Allocate +1 for EVM and +1 as terminator. */
+	new_xattrs = kcalloc(blob_sizes.lbs_xattr + 2, sizeof(*new_xattrs),
+			     GFP_NOFS);
+	if (!new_xattrs)
+		return -ENOMEM;
+	hlist_for_each_entry(P, &security_hook_heads.inode_init_security,
+			     list) {
+		ret = P->hook.inode_init_security(inode, dir, qstr, new_xattrs);
+		if (ret && ret != -EOPNOTSUPP)
+			goto out;
+		if (ret == -EOPNOTSUPP)
+			continue;
+		ret = security_check_compact_xattrs(new_xattrs,
+						    blob_sizes.lbs_xattr,
+						    &cur_xattrs);
+		if (ret < 0) {
+			ret = -ENOMEM;
+			goto out;
+		}
+	}
 
-	evm_xattr = lsm_xattr + 1;
-	ret = evm_inode_init_security(inode, lsm_xattr, evm_xattr);
+	ret = evm_inode_init_security(inode, new_xattrs,
+				      new_xattrs + cur_xattrs);
 	if (ret)
 		goto out;
 	ret = initxattrs(inode, new_xattrs, fs_data);
@@ -1140,6 +1184,7 @@ out:
 			continue;
 		kfree(xattr->value);
 	}
+	kfree(new_xattrs);
 	if (initxattrs == &security_initxattrs)
 		return ret;
 	return (ret == -EOPNOTSUPP) ? 0 : ret;
@@ -1163,6 +1208,9 @@ int security_old_inode_init_security(struct inode *inode, struct inode *dir,
 	int ret;
 
 	if (unlikely(IS_PRIVATE(inode)))
+		return -EOPNOTSUPP;
+
+	if (!blob_sizes.lbs_xattr)
 		return -EOPNOTSUPP;
 
 	ret = security_inode_init_security(inode, dir, qstr,
