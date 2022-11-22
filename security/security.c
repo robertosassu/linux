@@ -30,8 +30,6 @@
 #include <linux/msg.h>
 #include <net/flow.h>
 
-#define MAX_LSM_EVM_XATTR	2
-
 /* How many LSMs were built into the kernel? */
 #define LSM_COUNT (__end_lsm_info - __start_lsm_info)
 
@@ -211,6 +209,7 @@ static void __init lsm_set_blob_sizes(struct lsm_blob_sizes *needed)
 	lsm_set_blob_size(&needed->lbs_msg_msg, &blob_sizes.lbs_msg_msg);
 	lsm_set_blob_size(&needed->lbs_superblock, &blob_sizes.lbs_superblock);
 	lsm_set_blob_size(&needed->lbs_task, &blob_sizes.lbs_task);
+	lsm_set_blob_size(&needed->lbs_xattr, &blob_sizes.lbs_xattr);
 }
 
 /* Prepare LSM for initialization. */
@@ -370,6 +369,7 @@ static void __init ordered_lsm_init(void)
 	init_debug("msg_msg blob size    = %d\n", blob_sizes.lbs_msg_msg);
 	init_debug("superblock blob size = %d\n", blob_sizes.lbs_superblock);
 	init_debug("task blob size       = %d\n", blob_sizes.lbs_task);
+	init_debug("xattr slots          = %d\n", blob_sizes.lbs_xattr);
 
 	/*
 	 * Create any kmem_caches needed for blobs
@@ -1117,37 +1117,116 @@ int security_dentry_create_files_as(struct dentry *dentry, int mode,
 }
 EXPORT_SYMBOL(security_dentry_create_files_as);
 
+/**
+ * security_check_compact_filled_xattrs - check xattrs and make array contiguous
+ * @xattrs: xattr array filled by LSMs
+ * @num_xattrs: length of xattr array
+ * @num_filled_xattrs: number of already processed xattrs
+ *
+ * Ensure that each xattr slot is correctly filled and close the gaps in the
+ * xattr array if an LSM didn't provide an xattr for which it asked space
+ * (legitimate case, it might have been loaded but not initialized). An LSM
+ * might request space in the xattr array for one or multiple xattrs. The LSM
+ * infrastructure ensures that all requests by LSMs are satisfied.
+ *
+ * Track the number of filled xattrs in @num_filled_xattrs, so that it is easy
+ * to determine whether the currently processed xattr is fine in its position
+ * (if all previous xattrs were filled) or it should be moved after the last
+ * filled xattr.
+ *
+ * Return: zero if all xattrs are valid, -EINVAL otherwise.
+ */
+static int security_check_compact_filled_xattrs(struct xattr *xattrs,
+						int num_xattrs,
+						int *num_filled_xattrs)
+{
+	int i;
+
+	for (i = *num_filled_xattrs; i < num_xattrs; i++) {
+		if ((!xattrs[i].name && xattrs[i].value) ||
+		    (xattrs[i].name && !xattrs[i].value))
+			return -EINVAL;
+
+		if (!xattrs[i].name)
+			continue;
+
+		if (i == *num_filled_xattrs) {
+			(*num_filled_xattrs)++;
+			continue;
+		}
+
+		memcpy(xattrs + (*num_filled_xattrs)++, xattrs + i,
+		       sizeof(*xattrs));
+		memset(xattrs + i, 0, sizeof(*xattrs));
+	}
+
+	return 0;
+}
+
 int security_inode_init_security(struct inode *inode, struct inode *dir,
 				 const struct qstr *qstr,
 				 const initxattrs initxattrs, void *fs_data)
 {
-	struct xattr new_xattrs[MAX_LSM_EVM_XATTR + 1];
-	struct xattr *lsm_xattr, *evm_xattr, *xattr;
-	int ret;
+	struct security_hook_list *P;
+	struct xattr *new_xattrs;
+	struct xattr *xattr;
+	int ret = -EOPNOTSUPP, num_filled_xattrs = 0;
 
 	if (unlikely(IS_PRIVATE(inode)))
 		return 0;
 
+	if (!blob_sizes.lbs_xattr)
+		return 0;
+
 	if (!initxattrs)
 		return call_int_hook(inode_init_security, -EOPNOTSUPP, inode,
-				     dir, qstr, NULL, NULL, NULL);
-	memset(new_xattrs, 0, sizeof(new_xattrs));
-	lsm_xattr = new_xattrs;
-	ret = call_int_hook(inode_init_security, -EOPNOTSUPP, inode, dir, qstr,
-						&lsm_xattr->name,
-						&lsm_xattr->value,
-						&lsm_xattr->value_len);
-	if (ret)
+				    dir, qstr, NULL);
+	/* Allocate +1 for EVM and +1 as terminator. */
+	new_xattrs = kcalloc(blob_sizes.lbs_xattr + 2, sizeof(*new_xattrs),
+			     GFP_NOFS);
+	if (!new_xattrs)
+		return -ENOMEM;
+
+	hlist_for_each_entry(P, &security_hook_heads.inode_init_security,
+			     list) {
+		ret = P->hook.inode_init_security(inode, dir, qstr, new_xattrs);
+		if (ret && ret != -EOPNOTSUPP)
+			goto out;
+		/*
+		 * As documented in lsm_hooks.h, -EOPNOTSUPP in this context
+		 * means that the LSM is not willing to provide an xattr, not
+		 * that it wants to signal an error. Thus, continue to invoke
+		 * the remaining LSMs.
+		 */
+		if (ret == -EOPNOTSUPP)
+			continue;
+		/*
+		 * As the number of xattrs reserved by LSMs is not directly
+		 * available, directly use the total number blob_sizes.lbs_xattr
+		 * to keep the code simple, while being not the most efficient
+		 * way.
+		 */
+		ret = security_check_compact_filled_xattrs(new_xattrs,
+							   blob_sizes.lbs_xattr,
+							   &num_filled_xattrs);
+		if (ret < 0) {
+			ret = -ENOMEM;
+			goto out;
+		}
+	}
+
+	if (!num_filled_xattrs)
 		goto out;
 
-	evm_xattr = lsm_xattr + 1;
-	ret = evm_inode_init_security(inode, lsm_xattr, evm_xattr);
+	ret = evm_inode_init_security(inode, new_xattrs,
+				      new_xattrs + num_filled_xattrs);
 	if (ret)
 		goto out;
 	ret = initxattrs(inode, new_xattrs, fs_data);
 out:
 	for (xattr = new_xattrs; xattr->value != NULL; xattr++)
 		kfree(xattr->value);
+	kfree(new_xattrs);
 	return (ret == -EOPNOTSUPP) ? 0 : ret;
 }
 EXPORT_SYMBOL(security_inode_init_security);
