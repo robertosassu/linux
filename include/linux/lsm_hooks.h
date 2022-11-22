@@ -225,18 +225,22 @@
  *	This hook is called by the fs code as part of the inode creation
  *	transaction and provides for atomic labeling of the inode, unlike
  *	the post_create/mkdir/... hooks called by the VFS.  The hook function
- *	is expected to allocate the name and value via kmalloc, with the caller
- *	being responsible for calling kfree after using them.
+ *	is expected to allocate the value via kmalloc, with the caller
+ *	being responsible for calling kfree after using it.
  *	If the security module does not use security attributes or does
  *	not wish to put a security attribute on this particular inode,
  *	then it should return -EOPNOTSUPP to skip this processing.
  *	@inode contains the inode structure of the newly created inode.
  *	@dir contains the inode structure of the parent directory.
  *	@qstr contains the last path component of the new object.
- *	@name will be set to the allocated name suffix (e.g. selinux).
- *	@value will be set to the allocated attribute value.
- *	@len will be set to the length of the value.
- *	Returns 0 if @name and @value have been successfully set,
+ *	@xattrs contains the full array of xattrs provided by LSMs where
+ *	->name will be set to the name suffix (e.g. selinux).
+ *	->value will be set to the allocated attribute value.
+ *	->value_len will be set to the length of the value.
+ *	Slots in @xattrs need to be reserved by LSMs by providing the number of
+ *	the desired xattrs in the lbs_xattr field of the lsm_blob_sizes
+ *	structure.
+ *	Returns 0 if the requested slots in @xattrs have been successfully set,
  *	-EOPNOTSUPP if no security attribute is needed, or
  *	-ENOMEM on memory allocation failure.
  * @inode_init_security_anon:
@@ -1687,6 +1691,7 @@ struct lsm_blob_sizes {
 	int	lbs_ipc;
 	int	lbs_msg_msg;
 	int	lbs_task;
+	int	lbs_xattr;
 };
 
 /*
