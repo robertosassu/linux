@@ -28,6 +28,7 @@
 #include <linux/security.h>
 #include <linux/init.h>
 #include <linux/rculist.h>
+#include <linux/xattr.h>
 
 union security_list_options {
 	#define LSM_HOOK(RET, DEFAULT, NAME, ...) RET (*NAME)(__VA_ARGS__);
@@ -63,7 +64,20 @@ struct lsm_blob_sizes {
 	int	lbs_ipc;
 	int	lbs_msg_msg;
 	int	lbs_task;
+	int	lbs_xattr_count; /* number of xattr slots in new_xattrs array */
 };
+
+/*
+ * Retrieve the first available slot to fill with an xattr, and increment
+ * the number of filled slots.
+ */
+static inline struct xattr *lsm_find_xattr_slot(struct xattr *xattrs,
+						int *num_filled_xattrs)
+{
+	if (unlikely(!xattrs))
+		return NULL;
+	return xattrs + (*num_filled_xattrs)++;
+}
 
 /*
  * LSM_RET_VOID is used as the default value in LSM_HOOK definitions for void
