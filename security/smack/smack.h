@@ -21,6 +21,7 @@
 #include <linux/rculist.h>
 #include <linux/lsm_audit.h>
 #include <linux/msg.h>
+#include <linux/xattr.h>
 
 /*
  * Use IPv6 port labeling if IPv6 is enabled and secmarks
@@ -352,6 +353,13 @@ static inline struct superblock_smack *smack_superblock(
 					const struct super_block *superblock)
 {
 	return superblock->s_security + smack_blob_sizes.lbs_superblock;
+}
+
+static inline struct xattr *smack_xattr(struct xattr *xattrs)
+{
+	if (unlikely(!xattrs))
+		return NULL;
+	return xattrs + smack_blob_sizes.lbs_xattr_count;
 }
 
 /*

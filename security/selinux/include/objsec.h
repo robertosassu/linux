@@ -24,6 +24,7 @@
 #include <linux/spinlock.h>
 #include <linux/lsm_hooks.h>
 #include <linux/msg.h>
+#include <linux/xattr.h>
 #include <net/net_namespace.h>
 #include "flask.h"
 #include "avc.h"
@@ -176,6 +177,13 @@ static inline struct ipc_security_struct *selinux_ipc(
 						const struct kern_ipc_perm *ipc)
 {
 	return ipc->security + selinux_blob_sizes.lbs_ipc;
+}
+
+static inline struct xattr *selinux_xattr(struct xattr *xattrs)
+{
+	if (unlikely(!xattrs))
+		return NULL;
+	return xattrs + selinux_blob_sizes.lbs_xattr_count;
 }
 
 /*
