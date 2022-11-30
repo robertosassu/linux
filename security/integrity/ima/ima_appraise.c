@@ -278,6 +278,7 @@ static int xattr_verify(enum ima_hooks func, struct integrity_iint_cache *iint,
 			enum integrity_status *status, const char **cause)
 {
 	struct ima_max_digest_data hash;
+	struct ima_max_digest_data *hash_ptr = &hash;
 	struct signature_v2_hdr *sig;
 	int rc = -EINVAL, hash_start = 0;
 	int mask;
@@ -376,8 +377,17 @@ static int xattr_verify(enum ima_hooks func, struct integrity_iint_cache *iint,
 			break;
 		}
 
+		if (IS_ENABLED(CONFIG_VMAP_STACK)) {
+			hash_ptr = kmalloc(sizeof(*hash_ptr), GFP_KERNEL);
+			if (!hash_ptr) {
+				*cause = "out-of-memory";
+				*status = INTEGRITY_FAIL;
+				break;
+			}
+		}
+
 		rc = calc_file_id_hash(IMA_VERITY_DIGSIG, iint->ima_hash->algo,
-				       iint->ima_hash->digest, &hash.hdr);
+				       iint->ima_hash->digest, &hash_ptr->hdr);
 		if (rc) {
 			*cause = "sigv3-hashing-error";
 			*status = INTEGRITY_FAIL;
@@ -386,8 +396,8 @@ static int xattr_verify(enum ima_hooks func, struct integrity_iint_cache *iint,
 
 		rc = integrity_digsig_verify(INTEGRITY_KEYRING_IMA,
 					     (const char *)xattr_value,
-					     xattr_len, hash.digest,
-					     hash.hdr.length);
+					     xattr_len, hash_ptr->digest,
+					     hash_ptr->hdr.length);
 		if (rc) {
 			*cause = "invalid-verity-signature";
 			*status = INTEGRITY_FAIL;
@@ -401,6 +411,9 @@ static int xattr_verify(enum ima_hooks func, struct integrity_iint_cache *iint,
 		*cause = "unknown-ima-data";
 		break;
 	}
+
+	if (hash_ptr && hash_ptr != &hash)
+		kfree(hash_ptr);
 
 	return rc;
 }
