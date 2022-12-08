@@ -363,6 +363,7 @@ int public_key_verify_signature(const struct public_key *pkey,
 	struct scatterlist src_sg[2];
 	char alg_name[CRYPTO_MAX_ALG_NAME];
 	char *key, *ptr;
+	u32 key_max_len;
 	int ret;
 
 	pr_devel("==>%s()\n", __func__);
@@ -400,8 +401,12 @@ int public_key_verify_signature(const struct public_key *pkey,
 	if (!req)
 		goto error_free_tfm;
 
-	key = kmalloc(pkey->keylen + sizeof(u32) * 2 + pkey->paramlen,
-		      GFP_KERNEL);
+	key_max_len = max_t(u32,
+			    pkey->keylen + sizeof(u32) * 2 + pkey->paramlen,
+			    sig->s_size + sig->digest_size);
+
+	/* key is used to store the sig and digest too. */
+	key = kmalloc(key_max_len, GFP_KERNEL);
 	if (!key)
 		goto error_free_req;
 
@@ -424,9 +429,12 @@ int public_key_verify_signature(const struct public_key *pkey,
 			goto error_free_key;
 	}
 
+	memcpy(key, sig->s, sig->s_size);
+	memcpy(key + sig->s_size, sig->digest, sig->digest_size);
+
 	sg_init_table(src_sg, 2);
-	sg_set_buf(&src_sg[0], sig->s, sig->s_size);
-	sg_set_buf(&src_sg[1], sig->digest, sig->digest_size);
+	sg_set_buf(&src_sg[0], key, sig->s_size);
+	sg_set_buf(&src_sg[1], key + sig->s_size, sig->digest_size);
 	akcipher_request_set_crypt(req, src_sg, NULL, sig->s_size,
 				   sig->digest_size);
 	crypto_init_wait(&cwait);
