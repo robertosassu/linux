@@ -363,7 +363,8 @@ int public_key_verify_signature(const struct public_key *pkey,
 	struct scatterlist src_sg[2];
 	char alg_name[CRYPTO_MAX_ALG_NAME];
 	char *key, *ptr;
-	int ret;
+	char *sig_s, *digest;
+	int ret, verif_bundle_len;
 
 	pr_devel("==>%s()\n", __func__);
 
@@ -400,8 +401,21 @@ int public_key_verify_signature(const struct public_key *pkey,
 	if (!req)
 		goto error_free_tfm;
 
-	key = kmalloc(pkey->keylen + sizeof(u32) * 2 + pkey->paramlen,
-		      GFP_KERNEL);
+	verif_bundle_len = pkey->keylen + sizeof(u32) * 2 + pkey->paramlen;
+
+	sig_s = sig->s;
+	digest = sig->digest;
+
+	if (IS_ENABLED(CONFIG_VMAP_STACK)) {
+		if (!virt_addr_valid(sig_s))
+			verif_bundle_len += sig->s_size;
+
+		if (!virt_addr_valid(digest))
+			verif_bundle_len += sig->digest_size;
+	}
+
+	/* key points to a buffer which could contain the sig and digest too. */
+	key = kmalloc(verif_bundle_len, GFP_KERNEL);
 	if (!key)
 		goto error_free_req;
 
@@ -410,6 +424,21 @@ int public_key_verify_signature(const struct public_key *pkey,
 	ptr = pkey_pack_u32(ptr, pkey->algo);
 	ptr = pkey_pack_u32(ptr, pkey->paramlen);
 	memcpy(ptr, pkey->params, pkey->paramlen);
+
+	if (IS_ENABLED(CONFIG_VMAP_STACK)) {
+		ptr += pkey->paramlen;
+
+		if (!virt_addr_valid(sig_s)) {
+			sig_s = ptr;
+			memcpy(sig_s, sig->s, sig->s_size);
+			ptr += sig->s_size;
+		}
+
+		if (!virt_addr_valid(digest)) {
+			digest = ptr;
+			memcpy(digest, sig->digest, sig->digest_size);
+		}
+	}
 
 	if (pkey->key_is_private)
 		ret = crypto_akcipher_set_priv_key(tfm, key, pkey->keylen);
@@ -425,8 +454,8 @@ int public_key_verify_signature(const struct public_key *pkey,
 	}
 
 	sg_init_table(src_sg, 2);
-	sg_set_buf(&src_sg[0], sig->s, sig->s_size);
-	sg_set_buf(&src_sg[1], sig->digest, sig->digest_size);
+	sg_set_buf(&src_sg[0], sig_s, sig->s_size);
+	sg_set_buf(&src_sg[1], digest, sig->digest_size);
 	akcipher_request_set_crypt(req, src_sg, NULL, sig->s_size,
 				   sig->digest_size);
 	crypto_init_wait(&cwait);
