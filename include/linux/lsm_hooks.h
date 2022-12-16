@@ -463,6 +463,10 @@
  *	Check permission before setting posix acls
  *	The posix acls in @kacl are identified by @acl_name.
  *	Return 0 if permission is granted.
+ * @inode_post_set_acl:
+ *	Update inode security field after successful set_acl operation on
+ *	@dentry.
+ *	The posix acls in @kacl are identified by @acl_name.
  * @inode_get_acl:
  *	Check permission before getting osix acls
  *	The posix acls are identified by @acl_name.
