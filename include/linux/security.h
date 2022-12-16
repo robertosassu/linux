@@ -367,6 +367,8 @@ int security_inode_setxattr(struct user_namespace *mnt_userns,
 int security_inode_set_acl(struct user_namespace *mnt_userns,
 			   struct dentry *dentry, const char *acl_name,
 			   struct posix_acl *kacl);
+void security_inode_post_set_acl(struct dentry *dentry, const char *acl_name,
+				 struct posix_acl *kacl);
 int security_inode_get_acl(struct user_namespace *mnt_userns,
 			   struct dentry *dentry, const char *acl_name);
 int security_inode_remove_acl(struct user_namespace *mnt_userns,
@@ -895,6 +897,11 @@ static inline int security_inode_set_acl(struct user_namespace *mnt_userns,
 {
 	return 0;
 }
+
+static inline void security_inode_post_set_acl(struct dentry *dentry,
+					       const char *acl_name,
+					       struct posix_acl *kacl)
+{ }
 
 static inline int security_inode_get_acl(struct user_namespace *mnt_userns,
 					 struct dentry *dentry,
