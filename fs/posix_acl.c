@@ -1214,6 +1214,7 @@ retry_deleg:
 		error = -EOPNOTSUPP;
 	if (!error) {
 		fsnotify_xattr(dentry);
+		security_inode_post_remove_acl(dentry, acl_name);
 		evm_inode_post_remove_acl(mnt_userns, dentry, acl_name);
 	}
 

@@ -475,6 +475,10 @@
  *	Check permission before removing posix acls
  *	The posix acls are identified by @acl_name.
  *	Return 0 if permission is granted.
+ * @inode_post_remove_acl:
+ *	Update inode security field after successful set_acl operation on
+ *	@dentry.
+ *	The posix acls are identified by @acl_name.
  * @inode_getsecurity:
  *	Retrieve a copy of the extended attribute representation of the
  *	security label associated with @name for @inode via @buffer.  Note that

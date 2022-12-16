@@ -1544,6 +1544,13 @@ int security_inode_remove_acl(struct user_namespace *mnt_userns,
 	return evm_inode_remove_acl(mnt_userns, dentry, acl_name);
 }
 
+void security_inode_post_remove_acl(struct dentry *dentry, const char *acl_name)
+{
+	if (unlikely(IS_PRIVATE(d_backing_inode(dentry))))
+		return;
+	call_void_hook(inode_post_remove_acl, dentry, acl_name);
+}
+
 void security_inode_post_setxattr(struct dentry *dentry, const char *name,
 				  const void *value, size_t size, int flags)
 {
