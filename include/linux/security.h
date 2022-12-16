@@ -373,6 +373,8 @@ int security_inode_get_acl(struct user_namespace *mnt_userns,
 			   struct dentry *dentry, const char *acl_name);
 int security_inode_remove_acl(struct user_namespace *mnt_userns,
 			      struct dentry *dentry, const char *acl_name);
+void security_inode_post_remove_acl(struct dentry *dentry,
+				    const char *acl_name);
 void security_inode_post_setxattr(struct dentry *dentry, const char *name,
 				  const void *value, size_t size, int flags);
 int security_inode_getxattr(struct dentry *dentry, const char *name);
@@ -916,6 +918,10 @@ static inline int security_inode_remove_acl(struct user_namespace *mnt_userns,
 {
 	return 0;
 }
+
+static inline void security_inode_post_remove_acl(struct dentry *dentry,
+						  const char *acl_name)
+{ }
 
 static inline void security_inode_post_setxattr(struct dentry *dentry,
 		const char *name, const void *value, size_t size, int flags)
