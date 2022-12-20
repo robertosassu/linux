@@ -26,7 +26,6 @@
 #include <linux/fsnotify.h>
 #include <linux/personality.h>
 #include <linux/security.h>
-#include <linux/ima.h>
 #include <linux/syscalls.h>
 #include <linux/mount.h>
 #include <linux/audit.h>
@@ -3557,8 +3556,6 @@ static int do_open(struct nameidata *nd,
 		error = vfs_open(&nd->path, file);
 	if (!error)
 		error = security_file_post_open(file, op->acc_mode);
-	if (!error)
-		error = ima_file_check(file, op->acc_mode);
 	if (!error && do_truncate)
 		error = handle_truncate(mnt_userns, file);
 	if (unlikely(error > 0)) {
@@ -3622,7 +3619,6 @@ static int vfs_tmpfile(struct user_namespace *mnt_userns,
 		spin_unlock(&inode->i_lock);
 	}
 	security_inode_post_create_tmpfile(mnt_userns, dir, child, mode);
-	ima_post_create_tmpfile(mnt_userns, dir, child, mode);
 	return 0;
 }
 
@@ -3967,9 +3963,6 @@ retry:
 		case 0: case S_IFREG:
 			error = vfs_create(mnt_userns, path.dentry->d_inode,
 					   dentry, mode, true);
-			if (!error)
-				ima_post_path_mknod(mnt_userns, &path, dentry,
-						    mode, dev);
 			break;
 		case S_IFCHR: case S_IFBLK:
 			error = vfs_mknod(mnt_userns, path.dentry->d_inode,
