@@ -191,6 +191,14 @@ extern struct dentry *integrity_dir;
 
 struct modsig;
 
+#ifdef CONFIG_IMA
+void __init init_ima_lsm(void);
+#else
+static inline void __init init_ima_lsm(void)
+{
+}
+#endif
+
 #ifdef CONFIG_INTEGRITY_SIGNATURE
 
 int integrity_digsig_verify(const unsigned int id, const char *sig, int siglen,
