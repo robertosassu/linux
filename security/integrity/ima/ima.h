@@ -328,7 +328,7 @@ enum hash_algo ima_get_hash_algo(const struct evm_ima_xattr_data *xattr_value,
 				 int xattr_len);
 int ima_read_xattr(struct dentry *dentry,
 		   struct evm_ima_xattr_data **xattr_value, int xattr_len);
-
+int __init init_ima_appraise_lsm(void);
 #else
 static inline int ima_check_blacklist(struct integrity_iint_cache *iint,
 				      const struct modsig *modsig, int pcr)
@@ -379,6 +379,10 @@ static inline int ima_read_xattr(struct dentry *dentry,
 	return 0;
 }
 
+static inline int __init init_ima_appraise_lsm(void)
+{
+	return 0;
+}
 #endif /* CONFIG_IMA_APPRAISE */
 
 #ifdef CONFIG_IMA_APPRAISE_MODSIG
