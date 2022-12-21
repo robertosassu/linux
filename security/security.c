@@ -1733,7 +1733,7 @@ int security_mmap_file(struct file *file, unsigned long prot,
 					mmap_prot(file, prot), flags);
 	if (ret)
 		return ret;
-	return ima_file_mmap(file, prot);
+	return ima_file_mmap(file, mmap_prot(file, prot));
 }
 
 int security_mmap_addr(unsigned long addr)
