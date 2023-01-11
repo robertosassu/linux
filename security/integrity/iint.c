@@ -175,16 +175,23 @@ static void init_once(void *foo)
 static int __init integrity_lsm_init(void)
 {
 	init_ima_lsm();
+	init_evm_lsm();
 
 	iint_cache =
 	    kmem_cache_create("iint_cache", sizeof(struct integrity_iint_cache),
 			      0, SLAB_PANIC, init_once);
 	return 0;
 }
+
+struct lsm_blob_sizes integrity_blob_sizes __lsm_ro_after_init = {
+	.lbs_xattr = 1,
+};
+
 DEFINE_LSM(integrity) = {
 	.name = "integrity",
 	.init = integrity_lsm_init,
 	.order = LSM_ORDER_LAST,
+	.blobs = &integrity_blob_sizes,
 };
 
 
