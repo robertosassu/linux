@@ -292,8 +292,9 @@ static void __init ordered_lsm_parse(const char *order, const char *origin)
 		}
 
 		if (!found)
-			init_debug("%s ignored: %s (not built into kernel)\n",
-				   origin, name);
+			init_debug("%s ignored: %s (%s)\n",
+				   origin, name, lsm->order == LSM_ORDER_LAST ?
+				   "last" : "not built into kernel");
 	}
 
 	/* Process "security=", if given. */
@@ -304,6 +305,12 @@ static void __init ordered_lsm_parse(const char *order, const char *origin)
 			if (strcmp(lsm->name, chosen_major_lsm) == 0)
 				append_ordered_lsm(lsm, "security=");
 		}
+	}
+
+	/* LSM_ORDER_LAST is always last. */
+	for (lsm = __start_lsm_info; lsm < __end_lsm_info; lsm++) {
+		if (lsm->order == LSM_ORDER_LAST)
+			append_ordered_lsm(lsm, "   last");
 	}
 
 	/* Disable all LSMs not in the ordered list. */
