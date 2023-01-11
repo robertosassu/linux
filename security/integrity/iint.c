@@ -24,6 +24,7 @@
 static struct rb_root integrity_iint_tree = RB_ROOT;
 static DEFINE_RWLOCK(integrity_iint_lock);
 static struct kmem_cache *iint_cache __read_mostly;
+static int integrity_enabled = 1;
 
 struct dentry *integrity_dir;
 
@@ -172,18 +173,21 @@ static void init_once(void *foo)
 	mutex_init(&iint->mutex);
 }
 
-static int __init integrity_iintcache_init(void)
+static int __init integrity_lsm_init(void)
 {
 	iint_cache =
 	    kmem_cache_create("iint_cache", sizeof(struct integrity_iint_cache),
 			      0, SLAB_PANIC, init_once);
+
+	init_ima_lsm();
 	return 0;
 }
 DEFINE_LSM(integrity) = {
 	.name = "integrity",
-	.init = integrity_iintcache_init,
+	.init = integrity_lsm_init,
+	.order = LSM_ORDER_LAST,
+	.enabled = &integrity_enabled,
 };
-
 
 /*
  * integrity_kernel_read - read data from the file
