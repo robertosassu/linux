@@ -1344,6 +1344,15 @@ int security_inode_create(struct inode *dir, struct dentry *dentry, umode_t mode
 }
 EXPORT_SYMBOL_GPL(security_inode_create);
 
+void security_inode_post_create_tmpfile(struct mnt_idmap *idmap,
+					struct inode *dir,
+					struct dentry *dentry, umode_t mode)
+{
+	if (unlikely(IS_PRIVATE(dir)))
+		return;
+	call_void_hook(inode_post_create_tmpfile, idmap, dir, dentry, mode);
+}
+
 int security_inode_link(struct dentry *old_dentry, struct inode *dir,
 			 struct dentry *new_dentry)
 {
