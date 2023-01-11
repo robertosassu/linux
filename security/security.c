@@ -295,6 +295,12 @@ static void __init ordered_lsm_parse(const char *order, const char *origin)
 				   origin, name);
 	}
 
+	/* Respect the relative order between LSMs as for LSM_ORDER_FIRST. */
+	for (lsm = __start_lsm_info; lsm < __end_lsm_info; lsm++) {
+		if (lsm->order == LSM_ORDER_LAST)
+			append_ordered_lsm(lsm, "  last");
+	}
+
 	/* Process "security=", if given. */
 	if (chosen_major_lsm) {
 		for (lsm = __start_lsm_info; lsm < __end_lsm_info; lsm++) {
