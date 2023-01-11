@@ -26,7 +26,6 @@
 #include <linux/mnt_idmapping.h>
 #include <linux/iversion.h>
 #include <linux/security.h>
-#include <linux/evm.h>
 #include <linux/fsnotify.h>
 
 #include "internal.h"
@@ -1104,7 +1103,6 @@ retry_deleg:
 	if (!error) {
 		fsnotify_xattr(dentry);
 		security_inode_post_set_acl(dentry, acl_name, kacl);
-		evm_inode_post_set_acl(dentry, acl_name, kacl);
 	}
 
 out_inode_unlock:
@@ -1215,7 +1213,6 @@ retry_deleg:
 	if (!error) {
 		fsnotify_xattr(dentry);
 		security_inode_post_remove_acl(dentry, acl_name);
-		evm_inode_post_remove_acl(mnt_userns, dentry, acl_name);
 	}
 
 out_inode_unlock:
