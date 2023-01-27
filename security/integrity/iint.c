@@ -180,13 +180,20 @@ static int __init integrity_lsm_init(void)
 			      0, SLAB_PANIC, init_once);
 
 	init_ima_lsm();
+	init_evm_lsm();
 	return 0;
 }
+
+struct lsm_blob_sizes integrity_blob_sizes __lsm_ro_after_init = {
+	.lbs_xattr = 1,
+};
+
 DEFINE_LSM(integrity) = {
 	.name = "integrity",
 	.init = integrity_lsm_init,
 	.order = LSM_ORDER_LAST,
 	.enabled = &integrity_enabled,
+	.blobs = &integrity_blob_sizes,
 };
 
 /*
