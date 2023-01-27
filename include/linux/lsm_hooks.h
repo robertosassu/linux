@@ -1263,6 +1263,14 @@
  *	Return the length of the string (including terminating NUL) or -ve if
  *	an error.
  *	May also return 0 (and a NULL buffer pointer) if there is no label.
+ * @key_post_create_or_update:
+ *	Notify the caller of a key creation or update.
+ *	@keyring points to the keyring to which the key is linked to.
+ *	@key points to the created or updated key.
+ *	@payload points to the data used to instantiate or update the key.
+ *	@payload_len is the length of @payload.
+ *	@flags contains key flags.
+ *	@create is a flag indicating whether the key was created or updated.
  *
  * Security hooks affecting all System V IPC operations.
  *
