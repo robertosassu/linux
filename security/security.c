@@ -2771,6 +2771,14 @@ int security_key_getsecurity(struct key *key, char **_buffer)
 	return call_int_hook(key_getsecurity, 0, key, _buffer);
 }
 
+void security_key_post_create_or_update(struct key *keyring, struct key *key,
+					const void *payload, size_t payload_len,
+					unsigned long flags, bool create)
+{
+	call_void_hook(key_post_create_or_update, keyring, key, payload,
+		       payload_len, flags, create);
+}
+
 #endif	/* CONFIG_KEYS */
 
 #ifdef CONFIG_AUDIT
