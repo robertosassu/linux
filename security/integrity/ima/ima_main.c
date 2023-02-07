@@ -470,7 +470,7 @@ int ima_file_mprotect(struct vm_area_struct *vma, unsigned long prot)
 	action = ima_get_action(file_mnt_idmap(vma->vm_file), inode,
 				current_cred(), secid, MAY_EXEC, MMAP_CHECK,
 				&pcr, &template, NULL, NULL);
-	action |= ima_get_action(file_mnt_user_ns(vma->vm_file), inode,
+	action |= ima_get_action(file_mnt_idmap(vma->vm_file), inode,
 				 current_cred(), secid, MAY_EXEC,
 				 MMAP_CHECK_REQPROT, &pcr, &template, NULL,
 				 NULL);
