@@ -73,3 +73,11 @@ struct pgp_sig_parameters {
 
 extern int pgp_parse_sig_params(const u8 **_data, size_t *_datalen,
 				struct pgp_sig_parameters *p);
+
+/* From lib/mpi/mpicoder.c (in the Linux kernel). */
+#define MAX_EXTERN_MPI_BITS 16384
+#define DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
+#define MAX_MPI 5
+
+extern int mpi_key_length(const void *xbuffer, unsigned int xbuffer_len,
+			  unsigned int *nbits_arg, unsigned int *nbytes_arg);

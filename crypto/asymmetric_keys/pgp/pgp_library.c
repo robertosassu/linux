@@ -560,3 +560,38 @@ int pgp_parse_sig_params(const u8 **_data, size_t *_datalen,
 	*_datalen = datalen;
 	return 0;
 }
+
+/**
+ * mpi_key_length - Extract the length of an MPI
+ * @xbuffer: Buffer containing the MPI
+ * @xbuffer_len: Buffer length
+ * @nbits_arg: Bits of the MPI
+ * @nbytes_arg: Bytes of the MPI
+ *
+ * Parse a buffer containing an MPI and set the number of bits and bytes in
+ * the passed parameters.
+ *
+ * Return: Zero if the MPI was parsed correctly, a negative value otherwise.
+ */
+int mpi_key_length(const void *xbuffer, unsigned int xbuffer_len,
+		   unsigned int *nbits_arg, unsigned int *nbytes_arg)
+{
+	const uint8_t *buffer = xbuffer;
+	unsigned int nbits;
+
+	if (xbuffer_len < 2)
+		return -EINVAL;
+	nbits = buffer[0] << 8 | buffer[1];
+
+	if (nbits > MAX_EXTERN_MPI_BITS) {
+		pr_info("MPI: mpi too large (%u bits)\n", nbits);
+		return -EINVAL;
+	}
+
+	if (nbits_arg)
+		*nbits_arg = nbits;
+	if (nbytes_arg)
+		*nbytes_arg = DIV_ROUND_UP(nbits, 8);
+
+	return 0;
+}
