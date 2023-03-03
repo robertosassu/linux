@@ -3980,6 +3980,8 @@ retry:
 					  dentry, mode, 0);
 			break;
 	}
+	if (!error)
+		security_path_post_mknod(idmap, &path, dentry, mode, dev);
 out2:
 	done_path_create(&path, dentry);
 	if (retry_estale(error, lookup_flags)) {
