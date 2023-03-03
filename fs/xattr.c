@@ -534,6 +534,7 @@ __vfs_removexattr_locked(struct mnt_idmap *idmap,
 
 	if (!error) {
 		fsnotify_xattr(dentry);
+		security_inode_post_removexattr(dentry, name);
 		evm_inode_post_removexattr(dentry, name);
 	}
 
