@@ -85,6 +85,7 @@ TARGETS += timers
 endif
 TARGETS += tmpfs
 TARGETS += tpm2
+TARGETS += umd_mgmt
 TARGETS += user
 TARGETS += vDSO
 TARGETS += mm
