@@ -306,7 +306,7 @@ static int evm_protected_xattr_common(const char *req_xattr_name,
 	return found;
 }
 
-static int evm_protected_xattr(const char *req_xattr_name)
+int evm_protected_xattr(const char *req_xattr_name)
 {
 	return evm_protected_xattr_common(req_xattr_name, false);
 }
@@ -870,14 +870,33 @@ int evm_inode_init_security(struct inode *inode, struct inode *dir,
 			    int *num_filled_xattrs)
 {
 	struct evm_xattr *xattr_data;
-	struct xattr *evm_xattr;
+	struct xattr *xattr, *evm_xattr;
+	bool evm_protected_xattrs = false;
 	int rc;
 
-	if (!(evm_initialized & EVM_INIT_HMAC) || !xattrs ||
-	    !evm_protected_xattr(xattrs->name))
+	if (!(evm_initialized & EVM_INIT_HMAC) || !xattrs)
+		return -EOPNOTSUPP;
+
+	/*
+	 * security_inode_init_security() makes sure that the xattrs array is
+	 * contiguous, there is enough space for security.evm, and that there is
+	 * a terminator at the end of the array.
+	 */
+	for (xattr = xattrs; xattr->name != NULL; xattr++) {
+		if (evm_protected_xattr(xattr->name))
+			evm_protected_xattrs = true;
+	}
+
+	/* EVM xattr not needed. */
+	if (!evm_protected_xattrs)
 		return -EOPNOTSUPP;
 
 	evm_xattr = lsm_find_xattr_slot(xattrs, num_filled_xattrs);
+	/*
+	 * Array terminator (xattr name = NULL) must be the first non-filled
+	 * xattr slot.
+	 */
+	BUG_ON(evm_xattr != xattr);
 
 	xattr_data = kzalloc(sizeof(*xattr_data), GFP_NOFS);
 	if (!xattr_data)
