@@ -66,6 +66,8 @@ static inline int digest_putc(int alg_fd, uint8_t ch)
 struct pgp_key_data_parse_context {
 	struct pgp_parse_context pgp;
 	struct umd_key_msg_out *out;
+	size_t user_id_len;
+	u8 user_id[256];
 };
 
 /*
@@ -233,6 +235,18 @@ static int pgp_process_public_key(struct pgp_parse_context *context,
 	kenter(",%u,%u,,%zu\n", type, headerlen, datalen);
 
 	if (ctx->out->kids.kid1_len[0]) {
+		if (!ctx->user_id_len) {
+			if (ctx->user_id_len > sizeof(ctx->user_id)) {
+				kleave(" = -EINVAL [user ID too big]");
+				return -EINVAL;
+			}
+
+			ctx->user_id_len = datalen;
+			memcpy(ctx->user_id, data, datalen);
+			kleave(" = 0 [user ID]");
+			return 0;
+		}
+
 		kleave(" = -ENOKEY [already]");
 		return -ENOKEY;
 	}
@@ -330,14 +344,48 @@ cleanup:
 void pgp_key_parse_umh(struct msg_in *in, struct msg_out *out)
 {
 	struct pgp_key_data_parse_context ctx;
+	int i;
 
 	kenter("\n");
 
 	memset(&ctx, 0, sizeof(ctx));
 	ctx.out = &out->key;
-	ctx.pgp.types_of_interest = (1 << PGP_PKT_PUBLIC_KEY);
+	ctx.pgp.types_of_interest = (1 << PGP_PKT_PUBLIC_KEY) |
+				    (1 << PGP_PKT_USER_ID);
 	ctx.pgp.process_packet = pgp_process_public_key;
 
 	out->ret = pgp_parse_packets(in->data, in->data_len, &ctx.pgp);
+
+	if (!out->ret && ctx.user_id_len > 0) {
+		/*
+		 * Propose a description for the key (user ID without the
+		 * comment).
+		 */
+		size_t ulen = ctx.user_id_len;
+		u8 *kid1 = out->key.kids.kid1[0];
+		const u8 *p;
+
+		p = memchr(ctx.user_id, '(', ulen);
+		if (p) {
+			/* Remove the comment */
+			do {
+				p--;
+			} while (*p == ' ' && p > ctx.user_id);
+			if (*p != ' ')
+				p++;
+			ulen = p - ctx.user_id;
+		}
+
+		if (ulen > 255 - 9)
+			ulen = 255 - 9;
+		memcpy(out->key.key_desc, ctx.user_id, ulen);
+		out->key.key_desc[ulen] = ' ';
+		for (i = 0; i < 4; i++)
+			sprintf(out->key.key_desc + ulen + 1 + i * 2, "%02x",
+				kid1[out->key.kids.kid1_len[0] - 4 + i]);
+		out->key.key_desc[ulen + 9] = 0;
+		pr_debug("desc '%s'\n", out->key.key_desc);
+	}
+
 	kleave(" = %d\n", out->ret);
 }
