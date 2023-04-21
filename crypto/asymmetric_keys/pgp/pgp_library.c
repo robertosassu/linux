@@ -11,6 +11,8 @@
 #include <limits.h>
 #include <string.h>
 #include <stdbool.h>
+#include <stdlib.h>
+#include <linux/asn1_encoder.h>
 
 #include "pgplib.h"
 
@@ -594,4 +596,79 @@ int mpi_key_length(const void *xbuffer, unsigned int xbuffer_len,
 		*nbytes_arg = DIV_ROUND_UP(nbits, 8);
 
 	return 0;
+}
+
+/**
+ * mpi_to_asn1_integers - Convert MPIs to the ASN.1 format
+ * @start: Start address of the buffer where converted data is written
+ * @end: End address of the buffer where converted data is written
+ * @data: Buffer containing the MPIs
+ * @datalen: Length of @data
+ *
+ * Convert the desired number of MPIs to the ASN.1 format (SEQUENCE of INTEGER).
+ * This is the format expected by the Linux kernel.
+ *
+ * Return: Zero on successful conversion, a negative value otherwise.
+ */
+int mpi_to_asn1_integers(u8 *start, u8 *end, int num_mpi, const u8 *data,
+			 size_t datalen)
+{
+	const int SCRATCH_SIZE = 4096;
+	u8 *scratch = malloc(SCRATCH_SIZE);
+	u8 *work = scratch, *temp_work;
+	u8 *end_work = scratch + SCRATCH_SIZE;
+	u8 *end_p;
+	unsigned int nbytes;
+	int ret, i;
+
+	if (!work)
+		return -ENOMEM;
+
+	for (i = 0; i < num_mpi; i++) {
+		ret = mpi_key_length(data, datalen, NULL, &nbytes);
+		if (ret < 0) {
+			pr_debug("MPI: bad key length\n");
+			goto out;
+		}
+
+		data += 2;
+		datalen -= 2;
+
+		if (datalen < nbytes) {
+			pr_debug("MPI: not enough data\n");
+			ret = -EBADMSG;
+			goto out;
+		}
+
+		temp_work = work;
+		work = asn1_encode_tag(work, end_work, ASN1_INT, data, nbytes);
+		if (IS_ERR(work)) {
+			pr_debug("MPI: failed to convert\n");
+			ret = PTR_ERR(work);
+			goto out;
+		}
+
+		/* Override with primitive type. */
+		temp_work[0] = _tag(UNIV, PRIM, INT);
+
+		data += nbytes;
+		datalen -= nbytes;
+	}
+
+	if (datalen) {
+		pr_debug("MPI: data not consumed, %ld bytes left\n", datalen);
+		ret = -EBADMSG;
+		goto out;
+	}
+
+	end_p = asn1_encode_sequence(start, end, scratch, work - scratch);
+	if (IS_ERR(end_p)) {
+		pr_debug("MPI: failed to convert\n");
+		ret = PTR_ERR(end_p);
+	} else {
+		ret = end_p - start;
+	}
+out:
+	free(scratch);
+	return ret;
 }

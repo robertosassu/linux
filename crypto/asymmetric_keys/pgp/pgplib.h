@@ -81,3 +81,5 @@ extern int pgp_parse_sig_params(const u8 **_data, size_t *_datalen,
 
 extern int mpi_key_length(const void *xbuffer, unsigned int xbuffer_len,
 			  unsigned int *nbits_arg, unsigned int *nbytes_arg);
+extern int mpi_to_asn1_integers(u8 *start, u8 *end, int num_mpi, const u8 *data,
+				size_t datalen);
