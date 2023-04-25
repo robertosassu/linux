@@ -92,7 +92,8 @@ obj-$(CONFIG_UMD_SIG_PARSER) += umd_sig_parser.o
 #
 CC=klcc
 userprogs := umd_key_sig_umh
-umd_key_sig_umh-objs := umd_key_sig_umh_user.o
+umd_key_sig_umh-objs := umd_key_sig_umh_user.o ../../lib/asn1_encoder.o
+userccflags += -I include
 userldflags += -static
 
 $(obj)/umd_key_sig_umh_blob.o: $(obj)/umd_key_sig_umh

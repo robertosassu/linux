@@ -6,9 +6,11 @@
  */
 
 #include <linux/asn1_encoder.h>
+#ifdef __KERNEL__
 #include <linux/bug.h>
 #include <linux/string.h>
 #include <linux/module.h>
+#endif
 
 /**
  * asn1_encode_integer() - encode positive integer to ASN.1
