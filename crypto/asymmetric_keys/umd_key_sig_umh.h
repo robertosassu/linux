@@ -71,3 +71,4 @@ struct msg_out {
 } __packed;
 
 void pgp_key_parse_umh(struct msg_in *in, struct msg_out *out);
+void pgp_sig_parse_umh(struct msg_in *in, struct msg_out *out);

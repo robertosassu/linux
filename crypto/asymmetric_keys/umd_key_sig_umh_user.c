@@ -108,6 +108,9 @@ int main(int argc, char *argv[])
 		case CMD_KEY:
 			pgp_key_parse_umh(in, out);
 			break;
+		case CMD_SIG:
+			pgp_sig_parse_umh(in, out);
+			break;
 		default:
 			out->ret = -EOPNOTSUPP;
 			break;
