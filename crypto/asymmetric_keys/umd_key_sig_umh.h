@@ -69,3 +69,5 @@ struct msg_out {
 		struct umd_sig_msg_out sig;
 	};
 } __packed;
+
+void pgp_key_parse_umh(struct msg_in *in, struct msg_out *out);

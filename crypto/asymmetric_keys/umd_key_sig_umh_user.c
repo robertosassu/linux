@@ -11,8 +11,48 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <limits.h>
+#include <sys/socket.h>
+#include <linux/if_alg.h>
 
-#include "umd_key_sig_umh.h"
+#include "pgp/pgplib.h"
+
+int alg_fds_array[FD__LAST] = { -1 };
+const char *alg_strs[] = { "sha1", "md5", NULL };
+
+static int get_alg_fd(const char *alg_name)
+{
+	struct sockaddr_alg sa = {
+		.salg_family = 38,
+		.salg_type = "hash",
+	};
+
+	int ret, fd, fd_accept = -1;
+
+	strlcpy((char *)sa.salg_name, alg_name, sizeof(sa.salg_name));
+
+	fd = socket(38, SOCK_SEQPACKET, 0);
+	if (fd == -1)
+		return fd;
+
+	ret = bind(fd, (struct sockaddr *)&sa, sizeof(sa));
+	if (ret == -1)
+		goto out;
+
+	fd_accept = accept(fd, NULL, 0);
+out:
+	close(fd);
+	return fd_accept;
+}
+
+static void close_alg_fds(void)
+{
+	int i;
+
+	for (i = 0; i < FD__LAST; i++)
+		if (alg_fds_array[i] >= 0)
+			close(alg_fds_array[i]);
+}
 
 FILE *debug_f;
 
@@ -22,8 +62,15 @@ int main(int argc, char *argv[])
 	struct msg_out *out = NULL;
 	size_t in_len, out_len;
 	loff_t pos;
-	int ret = 0;
+	int ret = 0, i;
 
+	for (i = 0; i < FD__LAST; i++) {
+		alg_fds_array[i] = get_alg_fd(alg_strs[i]);
+		if (alg_fds_array[i] == -1) {
+			close_alg_fds();
+			exit(1);
+		}
+	}
 #ifdef debug
 	debug_f = fopen("/dev/kmsg", "a");
 	fprintf(debug_f, "<5>Started %s\n", argv[0]);
@@ -58,6 +105,9 @@ int main(int argc, char *argv[])
 		}
 
 		switch (in->cmd) {
+		case CMD_KEY:
+			pgp_key_parse_umh(in, out);
+			break;
 		default:
 			out->ret = -EOPNOTSUPP;
 			break;
@@ -75,6 +125,7 @@ int main(int argc, char *argv[])
 		}
 	}
 out:
+	close_alg_fds();
 	free(in);
 	free(out);
 #ifdef debug

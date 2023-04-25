@@ -6,7 +6,10 @@
  */
 
 #include <asm/bitsperlong.h>
+#include <linux/hash_info.h>
+
 #include "pgp.h"
+#include "../umd_key_sig_umh.h"
 
 extern FILE *debug_f;
 
@@ -23,6 +26,11 @@ extern FILE *debug_f;
 #define kenter(...)
 #define kleave(...)
 #endif
+
+enum alg_fds { FD_SHA1, FD_MD5, FD__LAST };
+extern int alg_fds_array[FD__LAST];
+
+const enum pub_key_algos pgp_to_public_key_algo[PGP_PUBKEY__LAST];
 
 /*
  * PGP library packet parser
