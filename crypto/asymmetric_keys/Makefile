@@ -82,4 +82,5 @@ $(obj)/mscode.asn1.o: $(obj)/mscode.asn1.c $(obj)/mscode.asn1.h
 # User asymmetric keys and signatures
 #
 obj-$(CONFIG_UASYM_KEYS_SIGS) += uasym_keys_sigs.o
-uasym_keys_sigs-y := uasym_key_parser.o
+uasym_keys_sigs-y := uasym_key_parser.o \
+		     uasym_sig_parser.o
