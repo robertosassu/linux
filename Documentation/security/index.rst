@@ -19,3 +19,4 @@ Security Documentation
    digsig
    landlock
    secrets/index
+   digest_cache

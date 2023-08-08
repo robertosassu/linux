@@ -6196,6 +6196,7 @@ DIGEST_CACHE LSM
 M:	Roberto Sassu <roberto.sassu@huawei.com>
 L:	linux-security-module@vger.kernel.org
 S:	Maintained
+F:	Documentation/security/digest_cache.rst
 F:	security/digest_cache/
 F:	tools/testing/selftests/digest_cache/
 
