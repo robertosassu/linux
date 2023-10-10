@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: GPL-2.0
+config SECURITY_DIGEST_CACHE
+	bool "Digest_cache LSM"
+	default n
+	help
+	  This option enables an LSM maintaining a cache of digests
+	  (e.g. of file content or metadata).
+
+	  This LSM can support other kernel components in making access
+	  control decisions.
+
+config DIGEST_LIST_DEFAULT_PATH
+	string
+	default "/etc/digest_lists"
+	help
+	  Default directory where digest_cache LSM expects to find digest lists.

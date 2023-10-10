@@ -6192,6 +6192,12 @@ L:	linux-gpio@vger.kernel.org
 S:	Maintained
 F:	drivers/gpio/gpio-gpio-mm.c
 
+DIGEST_CACHE LSM
+M:	Roberto Sassu <roberto.sassu@huawei.com>
+L:	linux-security-module@vger.kernel.org
+S:	Maintained
+F:	security/digest_cache/
+
 DIGITEQ AUTOMOTIVE MGB4 V4L2 DRIVER
 M:	Martin Tuma <martin.tuma@digiteqautomotive.com>
 L:	linux-media@vger.kernel.org
