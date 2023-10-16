@@ -190,6 +190,7 @@ int integrity_kernel_read(struct file *file, loff_t offset,
 
 extern struct dentry *integrity_dir;
 extern const struct lsm_id integrity_lsmid;
+extern struct lsm_blob_sizes integrity_blob_sizes;
 
 struct modsig;
 
@@ -197,6 +198,14 @@ struct modsig;
 void __init init_ima_lsm(void);
 #else
 static inline void __init init_ima_lsm(void)
+{
+}
+#endif
+
+#ifdef CONFIG_EVM
+void __init init_evm_lsm(void);
+#else
+static inline void __init init_evm_lsm(void)
 {
 }
 #endif

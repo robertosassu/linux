@@ -200,8 +200,13 @@ static int __init integrity_lsm_init(void)
 			      0, SLAB_PANIC, iint_init_once);
 
 	init_ima_lsm();
+	init_evm_lsm();
 	return 0;
 }
+
+struct lsm_blob_sizes integrity_blob_sizes __ro_after_init = {
+	.lbs_xattr_count = 1,
+};
 
 const struct lsm_id integrity_lsmid = {
 	.name = "integrity",
@@ -212,6 +217,7 @@ DEFINE_LSM(integrity) = {
 	.name = "integrity",
 	.init = integrity_lsm_init,
 	.order = LSM_ORDER_LAST,
+	.blobs = &integrity_blob_sizes,
 };
 
 /*
