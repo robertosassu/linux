@@ -193,19 +193,29 @@ static void iint_init_once(void *foo)
 	memset(iint, 0, sizeof(*iint));
 }
 
-static int __init integrity_iintcache_init(void)
+int __init integrity_iintcache_init(const struct lsm_id *lsmid)
 {
+	/* Avoid duplicate initialization. */
+	if (iint_cache)
+		return 0;
+
 	iint_cache =
 	    kmem_cache_create("iint_cache", sizeof(struct integrity_iint_cache),
 			      0, SLAB_PANIC, iint_init_once);
 	return 0;
 }
+
+static int __init integrity_dummy_init(void)
+{
+	return 0;
+}
+
+/* Keep it until IMA and EVM use disjoint integrity metadata. */
 DEFINE_LSM(integrity) = {
 	.name = "integrity",
-	.init = integrity_iintcache_init,
+	.init = integrity_dummy_init,
 	.order = LSM_ORDER_LAST,
 };
-
 
 /*
  * integrity_kernel_read - read data from the file
