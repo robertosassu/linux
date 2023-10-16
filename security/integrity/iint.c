@@ -193,19 +193,26 @@ static void iint_init_once(void *foo)
 	memset(iint, 0, sizeof(*iint));
 }
 
-static int __init integrity_iintcache_init(void)
+static int __init integrity_lsm_init(void)
 {
 	iint_cache =
 	    kmem_cache_create("iint_cache", sizeof(struct integrity_iint_cache),
 			      0, SLAB_PANIC, iint_init_once);
+
+	init_ima_lsm();
 	return 0;
 }
-DEFINE_LSM(integrity) = {
+
+const struct lsm_id integrity_lsmid = {
 	.name = "integrity",
-	.init = integrity_iintcache_init,
-	.order = LSM_ORDER_LAST,
+	.id = LSM_ID_IMA,
 };
 
+DEFINE_LSM(integrity) = {
+	.name = "integrity",
+	.init = integrity_lsm_init,
+	.order = LSM_ORDER_LAST,
+};
 
 /*
  * integrity_kernel_read - read data from the file
