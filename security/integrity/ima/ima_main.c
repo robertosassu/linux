@@ -1135,6 +1135,7 @@ void __init init_ima_lsm(void)
 	 * subsystem for the management of integrity metadata.
 	 */
 	security_add_hooks(ima_hooks, ARRAY_SIZE(ima_hooks), &integrity_lsmid);
+	init_ima_appraise_lsm();
 }
 
 late_initcall(init_ima);	/* Start IMA after the TPM is available */
