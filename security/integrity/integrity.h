@@ -178,6 +178,7 @@ struct integrity_iint_cache {
  * integrity data associated with an inode.
  */
 struct integrity_iint_cache *integrity_iint_find(struct inode *inode);
+struct integrity_iint_cache *integrity_inode_get(struct inode *inode);
 int __init integrity_iintcache_init(const struct lsm_id *lsmid);
 
 int integrity_kernel_read(struct file *file, loff_t offset,
@@ -235,11 +236,17 @@ static inline int __init integrity_load_cert(const unsigned int id,
 #ifdef CONFIG_INTEGRITY_ASYMMETRIC_KEYS
 int asymmetric_verify(struct key *keyring, const char *sig,
 		      int siglen, const char *data, int datalen);
+int integrity_kernel_module_request(char *kmod_name);
 #else
 static inline int asymmetric_verify(struct key *keyring, const char *sig,
 				    int siglen, const char *data, int datalen)
 {
 	return -EOPNOTSUPP;
+}
+
+static inline int integrity_kernel_module_request(char *kmod_name)
+{
+	return 0;
 }
 #endif
 
