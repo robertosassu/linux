@@ -122,6 +122,7 @@ struct ima_rule_entry {
 	struct ima_rule_opt_list *keyrings; /* Measure keys added to these keyrings */
 	struct ima_rule_opt_list *label; /* Measure data grouped under this label */
 	struct ima_template_desc *template;
+	u64 digest_cache_mask;	/* Actions and purposes for which digest cache is allowed */
 };
 
 /*
@@ -726,6 +727,7 @@ static int get_subaction(struct ima_rule_entry *rule, enum ima_hooks func)
  * @template_desc: the template that should be used for this rule
  * @func_data: func specific data, may be NULL
  * @allowed_algos: allowlist of hash algorithms for the IMA xattr
+ * @digest_cache_mask: Actions and purposes for which digest cache is allowed
  *
  * Measure decision based on func/mask/fsmagic and LSM(subj/obj/type)
  * conditions.
@@ -738,7 +740,8 @@ int ima_match_policy(struct mnt_idmap *idmap, struct inode *inode,
 		     const struct cred *cred, u32 secid, enum ima_hooks func,
 		     int mask, int flags, int *pcr,
 		     struct ima_template_desc **template_desc,
-		     const char *func_data, unsigned int *allowed_algos)
+		     const char *func_data, unsigned int *allowed_algos,
+		     u64 *digest_cache_mask)
 {
 	struct ima_rule_entry *entry;
 	int action = 0, actmask = flags | (flags << 1);
@@ -782,6 +785,9 @@ int ima_match_policy(struct mnt_idmap *idmap, struct inode *inode,
 
 		if (template_desc && entry->template)
 			*template_desc = entry->template;
+
+		if (digest_cache_mask)
+			*digest_cache_mask |= entry->digest_cache_mask;
 
 		if (!actmask)
 			break;
@@ -857,6 +863,30 @@ static int ima_appraise_flag(enum ima_hooks func)
 	else if (func == KEXEC_KERNEL_CHECK)
 		return IMA_APPRAISE_KEXEC;
 	return 0;
+}
+
+static bool ima_digest_cache_func_allowed(struct ima_rule_entry *entry)
+{
+	switch (entry->func) {
+	case NONE:
+	case FILE_CHECK:
+	case MMAP_CHECK:
+	case MMAP_CHECK_REQPROT:
+	case BPRM_CHECK:
+	case CREDS_CHECK:
+	case FIRMWARE_CHECK:
+	case POLICY_CHECK:
+	case MODULE_CHECK:
+	case KEXEC_KERNEL_CHECK:
+	case KEXEC_INITRAMFS_CHECK:
+		/* Exception: always add policy updates to measurement list! */
+		if (entry->action == MEASURE && entry->func == POLICY_CHECK)
+			return false;
+
+		return true;
+	default:
+		return false;
+	}
 }
 
 static void add_rules(struct ima_rule_entry *entries, int count,
@@ -1073,7 +1103,7 @@ enum policy_opt {
 	Opt_digest_type,
 	Opt_appraise_type, Opt_appraise_flag, Opt_appraise_algos,
 	Opt_permit_directio, Opt_pcr, Opt_template, Opt_keyrings,
-	Opt_label, Opt_err
+	Opt_label, Opt_digest_cache, Opt_err
 };
 
 static const match_table_t policy_tokens = {
@@ -1122,6 +1152,7 @@ static const match_table_t policy_tokens = {
 	{Opt_template, "template=%s"},
 	{Opt_keyrings, "keyrings=%s"},
 	{Opt_label, "label=%s"},
+	{Opt_digest_cache, "digest_cache=%s"},
 	{Opt_err, NULL}
 };
 
@@ -1243,6 +1274,18 @@ static bool ima_validate_rule(struct ima_rule_entry *entry)
 		return false;
 
 	if (entry->action != MEASURE && entry->flags & IMA_PCR)
+		return false;
+
+	/* New-style measurements with digest cache cannot be on default PCR. */
+	if (entry->action == MEASURE &&
+	    (entry->digest_cache_mask & IMA_DIGEST_CACHE_MEASURE_CONTENT)) {
+		if (!(entry->flags & IMA_PCR) ||
+		    entry->pcr == CONFIG_IMA_MEASURE_PCR_IDX)
+			return false;
+	}
+
+	/* Digest caches can be used only for a subset of the IMA hooks. */
+	if (entry->digest_cache_mask && !ima_digest_cache_func_allowed(entry))
 		return false;
 
 	if (entry->action != APPRAISE &&
@@ -1881,6 +1924,26 @@ static int ima_parse_rule(char *rule, struct ima_rule_entry *entry)
 						 &(template_desc->num_fields));
 			entry->template = template_desc;
 			break;
+		case Opt_digest_cache:
+			ima_log_string(ab, "digest_cache", args[0].from);
+
+			result = -EINVAL;
+
+			if (!strcmp(args[0].from, "content")) {
+				switch (entry->action) {
+				case MEASURE:
+					entry->digest_cache_mask |= IMA_DIGEST_CACHE_MEASURE_CONTENT;
+					result = 0;
+					break;
+				case APPRAISE:
+					entry->digest_cache_mask |= IMA_DIGEST_CACHE_APPRAISE_CONTENT;
+					result = 0;
+					break;
+				default:
+					break;
+				}
+			}
+			break;
 		case Opt_err:
 			ima_log_string(ab, "UNKNOWN", p);
 			result = -EINVAL;
@@ -2271,6 +2334,9 @@ int ima_policy_show(struct seq_file *m, void *v)
 		seq_puts(m, "digest_type=verity ");
 	if (entry->flags & IMA_PERMIT_DIRECTIO)
 		seq_puts(m, "permit_directio ");
+	if ((entry->digest_cache_mask & IMA_DIGEST_CACHE_MEASURE_CONTENT) ||
+	    (entry->digest_cache_mask & IMA_DIGEST_CACHE_APPRAISE_CONTENT))
+		seq_puts(m, "digest_cache=content ");
 	rcu_read_unlock();
 	seq_puts(m, "\n");
 	return 0;
