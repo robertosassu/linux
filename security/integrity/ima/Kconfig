@@ -321,4 +321,14 @@ config IMA_DISABLE_HTABLE
 	help
 	   This option disables htable to allow measurement of duplicate records.
 
+config IMA_DIGEST_CACHE_MEASURE_PCR_IDX
+	int
+	range 8 14
+	default 12
+	help
+	DIGEST_CACHE_MEASURE_PCR_IDX determines the TPM PCR register index
+	  that IMA uses to maintain the integrity aggregate of the
+	  measurement list, when the digest_cache LSM is used (different
+	  measurement style).  If unsure, use the default 12.
+
 endif

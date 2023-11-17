@@ -2011,7 +2011,8 @@
 	ima_policy=	[IMA]
 			The builtin policies to load during IMA setup.
 			Format: "tcb | appraise_tcb | secure_boot |
-				 fail_securely | critical_data"
+				 fail_securely | critical_data |
+				 digest_cache_measure | digest_cache_appraise"
 
 			The "tcb" policy measures all programs exec'd, files
 			mmap'd for exec, and all files opened with the read
@@ -2032,6 +2033,17 @@
 
 			The "critical_data" policy measures kernel integrity
 			critical data.
+
+			The "digest_cache_measure" policy measures digest lists
+			into PCR 12 (can be changed with kernel config), enables
+			the digest cache to be used for the other selected
+			measure rules, and measures the files with digest not
+			found in the digest list into PCR 12 (changeable).
+
+			The "digest_cache_appraise" policy appraises digest
+			lists with IMA signatures or module-style appended
+			signatures, and enables the digest cache to be used for
+			the other selected appraise rules.
 
 	ima_tcb		[IMA] Deprecated.  Use ima_policy= instead.
 			Load a policy which meets the needs of the Trusted

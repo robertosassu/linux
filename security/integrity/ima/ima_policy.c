@@ -254,6 +254,21 @@ static struct ima_rule_entry critical_data_rules[] __ro_after_init = {
 	{.action = MEASURE, .func = CRITICAL_DATA, .flags = IMA_FUNC},
 };
 
+static struct ima_rule_entry measure_digest_cache_rule __ro_after_init = {
+#ifdef CONFIG_SECURITY_DIGEST_CACHE
+	.action = MEASURE, .func = DIGEST_LIST_CHECK,
+	.pcr = CONFIG_IMA_DIGEST_CACHE_MEASURE_PCR_IDX,
+	.flags = IMA_FUNC | IMA_PCR
+#endif
+};
+
+static struct ima_rule_entry appraise_digest_cache_rule __ro_after_init = {
+#ifdef CONFIG_SECURITY_DIGEST_CACHE
+	.action = APPRAISE, .func = DIGEST_LIST_CHECK,
+	.flags = IMA_FUNC | IMA_DIGSIG_REQUIRED | IMA_MODSIG_ALLOWED,
+#endif
+};
+
 /* An array of architecture specific rules */
 static struct ima_rule_entry *arch_policy_entry __ro_after_init;
 
@@ -278,6 +293,8 @@ static bool ima_use_appraise_tcb __initdata;
 static bool ima_use_secure_boot __initdata;
 static bool ima_use_critical_data __initdata;
 static bool ima_fail_unverifiable_sigs __ro_after_init;
+static bool ima_digest_cache_measure __ro_after_init;
+static bool ima_digest_cache_appraise __ro_after_init;
 static int __init policy_setup(char *str)
 {
 	char *p;
@@ -295,6 +312,10 @@ static int __init policy_setup(char *str)
 			ima_use_critical_data = true;
 		else if (strcmp(p, "fail_securely") == 0)
 			ima_fail_unverifiable_sigs = true;
+		else if (strcmp(p, "digest_cache_measure") == 0)
+			ima_digest_cache_measure = true;
+		else if (strcmp(p, "digest_cache_appraise") == 0)
+			ima_digest_cache_appraise = true;
 		else
 			pr_err("policy \"%s\" not found", p);
 	}
@@ -915,6 +936,18 @@ static void add_rules(struct ima_rule_entry *entries, int count,
 			else
 				build_ima_appraise |=
 					ima_appraise_flag(entries[i].func);
+
+			if (IS_ENABLED(CONFIG_SECURITY_DIGEST_CACHE) &&
+			    ima_digest_cache_appraise &&
+			    ima_digest_cache_func_allowed(&entries[i]))
+				entries[i].digest_cache_mask |= IMA_DIGEST_CACHE_APPRAISE_CONTENT;
+		}
+		if (IS_ENABLED(CONFIG_SECURITY_DIGEST_CACHE) &&
+		    entries[i].action == MEASURE && ima_digest_cache_measure &&
+		    ima_digest_cache_func_allowed(&entries[i])) {
+			entries[i].digest_cache_mask |= IMA_DIGEST_CACHE_MEASURE_CONTENT;
+			entries[i].pcr = CONFIG_IMA_DIGEST_CACHE_MEASURE_PCR_IDX;
+			entries[i].flags |= IMA_PCR;
 		}
 	}
 }
@@ -970,6 +1003,16 @@ static int __init ima_init_arch_policy(void)
 void __init ima_init_policy(void)
 {
 	int build_appraise_entries, arch_entries;
+
+	/*
+	 * We need to load digest cache rules at the beginning, to avoid dont_
+	 * rules causing ours to not be reached.
+	 */
+	if (ima_digest_cache_measure)
+		add_rules(&measure_digest_cache_rule, 1, IMA_DEFAULT_POLICY);
+
+	if (ima_digest_cache_appraise)
+		add_rules(&appraise_digest_cache_rule, 1, IMA_DEFAULT_POLICY);
 
 	/* if !ima_policy, we load NO default rules */
 	if (ima_policy)
