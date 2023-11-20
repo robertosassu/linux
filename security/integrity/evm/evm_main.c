@@ -409,7 +409,7 @@ enum integrity_status evm_verifyxattr(struct dentry *dentry,
 		return INTEGRITY_UNKNOWN;
 
 	if (!iint) {
-		iint = integrity_iint_find(d_backing_inode(dentry));
+		iint = integrity_inode_get(d_backing_inode(dentry));
 		if (!iint)
 			return INTEGRITY_UNKNOWN;
 	}
@@ -984,7 +984,7 @@ evm_post_path_mknod(struct mnt_idmap *idmap, struct dentry *dentry)
 {
 	struct integrity_iint_cache *iint;
 
-	iint = integrity_iint_find(d_backing_inode(dentry));
+	iint = integrity_inode_get(d_backing_inode(dentry));
 	if (iint)
 		/* needed for successful verification of empty files */
 		iint->flags |= IMA_NEW_FILE;
