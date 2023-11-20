@@ -263,6 +263,18 @@ static void __init initialize_lsm(struct lsm_info *lsm)
 	}
 }
 
+/* Find an LSM with a given name. */
+static struct lsm_info __init *find_lsm(const char *name)
+{
+	struct lsm_info *lsm;
+
+	for (lsm = __start_lsm_info; lsm < __end_lsm_info; lsm++)
+		if (!strcmp(lsm->name, name))
+			return lsm;
+
+	return NULL;
+}
+
 /*
  * Current index to use while initializing the lsm id list.
  */
@@ -333,9 +345,22 @@ static void __init ordered_lsm_parse(const char *order, const char *origin)
 
 	/* LSM_ORDER_LAST is always last. */
 	for (lsm = __start_lsm_info; lsm < __end_lsm_info; lsm++) {
+		/* Do it later, to enforce the expected ordering. */
+		if (!strcmp(lsm->name, "ima") || !strcmp(lsm->name, "evm"))
+			continue;
+
 		if (lsm->order == LSM_ORDER_LAST)
 			append_ordered_lsm(lsm, "   last");
 	}
+
+	/* Ensure that the 'ima' and 'evm' LSMs are last and in this order. */
+	lsm = find_lsm("ima");
+	if (lsm)
+		append_ordered_lsm(lsm, "   last");
+
+	lsm = find_lsm("evm");
+	if (lsm)
+		append_ordered_lsm(lsm, "   last");
 
 	/* Disable all LSMs not in the ordered list. */
 	for (lsm = __start_lsm_info; lsm < __end_lsm_info; lsm++) {
