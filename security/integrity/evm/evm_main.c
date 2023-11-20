@@ -167,18 +167,20 @@ static int evm_find_protected_xattrs(struct dentry *dentry)
 static enum integrity_status evm_verify_hmac(struct dentry *dentry,
 					     const char *xattr_name,
 					     char *xattr_value,
-					     size_t xattr_value_len,
-					     struct integrity_iint_cache *iint)
+					     size_t xattr_value_len)
 {
 	struct evm_ima_xattr_data *xattr_data = NULL;
 	struct signature_v2_hdr *hdr;
 	enum integrity_status evm_status = INTEGRITY_PASS;
 	struct evm_digest digest;
 	struct inode *inode;
+	struct evm_iint_cache *iint;
 	int rc, xattr_len, evm_immutable = 0;
 
-	if (iint && (iint->evm_status == INTEGRITY_PASS ||
-		     iint->evm_status == INTEGRITY_PASS_IMMUTABLE))
+	iint = evm_inode_get_iint(d_backing_inode(dentry));
+
+	if ((iint->evm_status == INTEGRITY_PASS ||
+	     iint->evm_status == INTEGRITY_PASS_IMMUTABLE))
 		return iint->evm_status;
 
 	/* if status is not PASS, try to check again - against -ENOMEM */
@@ -243,8 +245,7 @@ static enum integrity_status evm_verify_hmac(struct dentry *dentry,
 			inode = d_backing_inode(dentry);
 
 			if (xattr_data->type == EVM_XATTR_PORTABLE_DIGSIG) {
-				if (iint)
-					iint->flags |= EVM_IMMUTABLE_DIGSIG;
+				iint->flags |= EVM_IMMUTABLE_DIGSIG;
 				evm_status = INTEGRITY_PASS_IMMUTABLE;
 			} else if (!IS_RDONLY(inode) &&
 				   !(inode->i_sb->s_readonly_remount) &&
@@ -271,8 +272,7 @@ static enum integrity_status evm_verify_hmac(struct dentry *dentry,
 	pr_debug("digest: (%d) [%*phN]\n", digest.hdr.length, digest.hdr.length,
 		  digest.digest);
 out:
-	if (iint)
-		iint->evm_status = evm_status;
+	iint->evm_status = evm_status;
 	kfree(xattr_data);
 	return evm_status;
 }
@@ -389,7 +389,6 @@ int evm_read_protected_xattrs(struct dentry *dentry, u8 *buffer,
  * @xattr_name: requested xattr
  * @xattr_value: requested xattr value
  * @xattr_value_len: requested xattr value length
- * @iint: inode integrity metadata
  *
  * Calculate the HMAC for the given dentry and verify it against the stored
  * security.evm xattr. For performance, use the xattr value and length
@@ -402,19 +401,13 @@ int evm_read_protected_xattrs(struct dentry *dentry, u8 *buffer,
  */
 enum integrity_status evm_verifyxattr(struct dentry *dentry,
 				      const char *xattr_name,
-				      void *xattr_value, size_t xattr_value_len,
-				      struct integrity_iint_cache *iint)
+				      void *xattr_value, size_t xattr_value_len)
 {
 	if (!evm_key_loaded() || !evm_protected_xattr(xattr_name))
 		return INTEGRITY_UNKNOWN;
 
-	if (!iint) {
-		iint = integrity_inode_get(d_backing_inode(dentry));
-		if (!iint)
-			return INTEGRITY_UNKNOWN;
-	}
 	return evm_verify_hmac(dentry, xattr_name, xattr_value,
-				 xattr_value_len, iint);
+				 xattr_value_len);
 }
 EXPORT_SYMBOL_GPL(evm_verifyxattr);
 
@@ -431,7 +424,7 @@ static enum integrity_status evm_verify_current_integrity(struct dentry *dentry)
 
 	if (!evm_key_loaded() || !S_ISREG(inode->i_mode) || evm_fixmode)
 		return INTEGRITY_PASS;
-	return evm_verify_hmac(dentry, NULL, NULL, 0, NULL);
+	return evm_verify_hmac(dentry, NULL, NULL, 0);
 }
 
 /*
@@ -503,14 +496,14 @@ static int evm_protect_xattr(struct mnt_idmap *idmap,
 
 	evm_status = evm_verify_current_integrity(dentry);
 	if (evm_status == INTEGRITY_NOXATTRS) {
-		struct integrity_iint_cache *iint;
+		struct evm_iint_cache *iint;
 
 		/* Exception if the HMAC is not going to be calculated. */
 		if (evm_hmac_disabled())
 			return 0;
 
-		iint = integrity_iint_find(d_backing_inode(dentry));
-		if (iint && (iint->flags & IMA_NEW_FILE))
+		iint = evm_inode_get_iint(d_backing_inode(dentry));
+		if ((iint->flags & IMA_NEW_FILE))
 			return 0;
 
 		/* exception for pseudo filesystems */
@@ -712,11 +705,9 @@ static int evm_inode_remove_acl(struct mnt_idmap *idmap, struct dentry *dentry,
 
 static void evm_reset_status(struct inode *inode)
 {
-	struct integrity_iint_cache *iint;
+	struct evm_iint_cache *iint = evm_inode_get_iint(inode);
 
-	iint = integrity_iint_find(inode);
-	if (iint)
-		iint->evm_status = INTEGRITY_UNKNOWN;
+	iint->evm_status = INTEGRITY_UNKNOWN;
 }
 
 /**
@@ -982,12 +973,11 @@ EXPORT_SYMBOL_GPL(evm_inode_init_security);
 static void __maybe_unused
 evm_post_path_mknod(struct mnt_idmap *idmap, struct dentry *dentry)
 {
-	struct integrity_iint_cache *iint;
+	struct evm_iint_cache *iint;
 
-	iint = integrity_inode_get(d_backing_inode(dentry));
-	if (iint)
-		/* needed for successful verification of empty files */
-		iint->flags |= IMA_NEW_FILE;
+	iint = evm_inode_get_iint(d_backing_inode(dentry));
+	/* needed for successful verification of empty files */
+	iint->flags |= IMA_NEW_FILE;
 }
 
 #ifdef CONFIG_EVM_LOAD_X509
@@ -1029,6 +1019,15 @@ error:
 	return error;
 }
 
+static int evm_inode_alloc_security(struct inode *inode)
+{
+	struct evm_iint_cache *evm_iint = evm_inode_get_iint(inode);
+
+	evm_iint->flags = 0UL;
+	evm_iint->evm_status = INTEGRITY_UNKNOWN;
+	return 0;
+}
+
 static struct security_hook_list evm_hooks[] __ro_after_init = {
 	LSM_HOOK_INIT(inode_setattr, evm_inode_setattr),
 	LSM_HOOK_INIT(inode_post_setattr, evm_inode_post_setattr),
@@ -1041,6 +1040,7 @@ static struct security_hook_list evm_hooks[] __ro_after_init = {
 	LSM_HOOK_INIT(inode_removexattr, evm_inode_removexattr),
 	LSM_HOOK_INIT(inode_post_removexattr, evm_inode_post_removexattr),
 	LSM_HOOK_INIT(inode_init_security, evm_inode_init_security),
+	LSM_HOOK_INIT(inode_alloc_security, evm_inode_alloc_security),
 #ifdef CONFIG_SECURITY_PATH
 	LSM_HOOK_INIT(path_post_mknod, evm_post_path_mknod),
 #endif
@@ -1064,7 +1064,8 @@ int __init init_evm_lsm(void)
 	return 0;
 }
 
-static struct lsm_blob_sizes evm_blob_sizes __ro_after_init = {
+struct lsm_blob_sizes evm_blob_sizes __ro_after_init = {
+	.lbs_inode = sizeof(struct evm_iint_cache),
 	.lbs_xattr_count = 1,
 };
 

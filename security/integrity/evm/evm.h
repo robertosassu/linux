@@ -32,6 +32,23 @@ struct xattr_list {
 	bool enabled;
 };
 
+/* EVM integrity metadata associated with an inode */
+struct evm_iint_cache {
+	unsigned long flags;
+	enum integrity_status evm_status:4;
+};
+
+extern struct lsm_blob_sizes evm_blob_sizes;
+
+static inline struct evm_iint_cache *
+evm_inode_get_iint(const struct inode *inode)
+{
+	struct evm_iint_cache *evm_iint_sec;
+
+	evm_iint_sec = inode->i_security + evm_blob_sizes.lbs_inode;
+	return evm_iint_sec;
+}
+
 extern int evm_initialized;
 
 #define EVM_ATTR_FSUUID		0x0001
