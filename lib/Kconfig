@@ -785,3 +785,6 @@ config POLYNOMIAL
 
 config FIRMWARE_TABLE
 	bool
+
+config TLV_PARSER
+	bool
