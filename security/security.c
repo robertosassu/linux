@@ -331,10 +331,16 @@ static void __init ordered_lsm_parse(const char *order, const char *origin)
 		}
 	}
 
-	/* LSM_ORDER_LAST is always last. */
+	/* LSM_ORDER_LAST after mutable ones. */
 	for (lsm = __start_lsm_info; lsm < __end_lsm_info; lsm++) {
 		if (lsm->order == LSM_ORDER_LAST)
 			append_ordered_lsm(lsm, "   last");
+	}
+
+	/* LSM_ORDER_REALLY_LAST after LSM_ORDER_LAST. */
+	for (lsm = __start_lsm_info; lsm < __end_lsm_info; lsm++) {
+		if (lsm->order == LSM_ORDER_REALLY_LAST)
+			append_ordered_lsm(lsm, "   really last");
 	}
 
 	/* Disable all LSMs not in the ordered list. */

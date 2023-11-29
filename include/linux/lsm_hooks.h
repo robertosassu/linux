@@ -125,7 +125,8 @@ extern void security_add_hooks(struct security_hook_list *hooks, int count,
 enum lsm_order {
 	LSM_ORDER_FIRST = -1,	/* This is only for capabilities. */
 	LSM_ORDER_MUTABLE = 0,
-	LSM_ORDER_LAST = 1,	/* This is only for integrity. */
+	LSM_ORDER_LAST = 1, /* For always enabled LSMs after mutable ones. */
+	LSM_ORDER_REALLY_LAST = 2, /* After the last ones. */
 };
 
 struct lsm_info {
