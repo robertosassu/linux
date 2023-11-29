@@ -1162,6 +1162,7 @@ DEFINE_LSM(ima) = {
 	.name = "ima",
 	.init = init_ima_lsm,
 	.order = LSM_ORDER_LAST,
+	.blobs = &integrity_blob_sizes,
 };
 
 late_initcall(init_ima);	/* Start IMA after the TPM is available */
