@@ -1158,10 +1158,15 @@ static int __init init_ima_lsm(void)
 	return 0;
 }
 
+struct lsm_blob_sizes integrity_blob_sizes __ro_after_init = {
+	.lbs_inode = sizeof(struct integrity_iint_cache *),
+};
+
 DEFINE_LSM(ima) = {
 	.name = "ima",
 	.init = init_ima_lsm,
 	.order = LSM_ORDER_LAST,
+	.blobs = &integrity_blob_sizes,
 };
 
 late_initcall(init_ima);	/* Start IMA after the TPM is available */
