@@ -200,12 +200,16 @@ static int __init integrity_iintcache_init(void)
 			      0, SLAB_PANIC, iint_init_once);
 	return 0;
 }
+
+/*
+ * Keep it until IMA and EVM can use disjoint integrity metadata, and their
+ * initialization order can be swapped without change in their behavior.
+ */
 DEFINE_LSM(integrity) = {
 	.name = "integrity",
 	.init = integrity_iintcache_init,
 	.order = LSM_ORDER_LAST,
 };
-
 
 /*
  * integrity_kernel_read - read data from the file
