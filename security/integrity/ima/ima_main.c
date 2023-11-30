@@ -1139,6 +1139,10 @@ static struct security_hook_list ima_hooks[] __ro_after_init = {
 #ifdef CONFIG_IMA_MEASURE_ASYMMETRIC_KEYS
 	LSM_HOOK_INIT(key_post_create_or_update, ima_post_key_create_or_update),
 #endif
+	LSM_HOOK_INIT(inode_free_security, integrity_inode_free),
+#ifdef CONFIG_INTEGRITY_ASYMMETRIC_KEYS
+	LSM_HOOK_INIT(kernel_module_request, integrity_kernel_module_request),
+#endif
 };
 
 static const struct lsm_id ima_lsmid = {
@@ -1148,6 +1152,7 @@ static const struct lsm_id ima_lsmid = {
 
 static int __init init_ima_lsm(void)
 {
+	integrity_iintcache_init();
 	security_add_hooks(ima_hooks, ARRAY_SIZE(ima_hooks), &ima_lsmid);
 	init_ima_appraise_lsm(&ima_lsmid);
 	return 0;

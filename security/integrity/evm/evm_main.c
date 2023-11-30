@@ -1030,6 +1030,9 @@ static struct security_hook_list evm_hooks[] __ro_after_init = {
 	LSM_HOOK_INIT(inode_removexattr, evm_inode_removexattr),
 	LSM_HOOK_INIT(inode_post_removexattr, evm_inode_post_removexattr),
 	LSM_HOOK_INIT(inode_init_security, evm_inode_init_security),
+#ifndef CONFIG_IMA
+	LSM_HOOK_INIT(inode_free_security, integrity_inode_free),
+#endif
 };
 
 static const struct lsm_id evm_lsmid = {
@@ -1039,6 +1042,9 @@ static const struct lsm_id evm_lsmid = {
 
 static int __init init_evm_lsm(void)
 {
+#ifndef CONFIG_IMA
+	integrity_iintcache_init();
+#endif
 	security_add_hooks(evm_hooks, ARRAY_SIZE(evm_hooks), &evm_lsmid);
 	return 0;
 }
