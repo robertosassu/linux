@@ -114,7 +114,7 @@ static int mmap_violation_check(enum ima_hooks func, struct file *file,
  *
  */
 static void ima_rdwr_violation_check(struct file *file,
-				     struct integrity_iint_cache *iint,
+				     struct ima_iint_cache *iint,
 				     int must_measure,
 				     char **pathbuf,
 				     const char **pathname,
@@ -125,12 +125,9 @@ static void ima_rdwr_violation_check(struct file *file,
 	bool send_tomtou = false, send_writers = false;
 
 	if (mode & FMODE_WRITE) {
-		if (atomic_read(&inode->i_readcount) && IS_IMA(inode)) {
-			if (!iint)
-				iint = integrity_iint_find(inode);
+		if (atomic_read(&inode->i_readcount)) {
 			/* IMA_MEASURE is set from reader side */
-			if (iint && test_bit(IMA_MUST_MEASURE,
-						&iint->atomic_flags))
+			if (test_bit(IMA_MUST_MEASURE, &iint->atomic_flags))
 				send_tomtou = true;
 		}
 	} else {
@@ -153,7 +150,7 @@ static void ima_rdwr_violation_check(struct file *file,
 				  "invalid_pcr", "open_writers");
 }
 
-static void ima_check_last_writer(struct integrity_iint_cache *iint,
+static void ima_check_last_writer(struct ima_iint_cache *iint,
 				  struct inode *inode, struct file *file)
 {
 	fmode_t mode = file->f_mode;
@@ -192,13 +189,9 @@ static void ima_check_last_writer(struct integrity_iint_cache *iint,
 static void ima_file_free(struct file *file)
 {
 	struct inode *inode = file_inode(file);
-	struct integrity_iint_cache *iint;
+	struct ima_iint_cache *iint = ima_iint_inode(inode);
 
 	if (!ima_policy_flag || !S_ISREG(inode->i_mode))
-		return;
-
-	iint = integrity_iint_find(inode);
-	if (!iint)
 		return;
 
 	ima_check_last_writer(iint, inode, file);
@@ -209,7 +202,7 @@ static int process_measurement(struct file *file, const struct cred *cred,
 			       enum ima_hooks func)
 {
 	struct inode *backing_inode, *inode = file_inode(file);
-	struct integrity_iint_cache *iint = NULL;
+	struct ima_iint_cache *iint = ima_iint_inode(inode);
 	struct ima_template_desc *template_desc = NULL;
 	char *pathbuf = NULL;
 	char filename[NAME_MAX];
@@ -247,20 +240,12 @@ static int process_measurement(struct file *file, const struct cred *cred,
 
 	inode_lock(inode);
 
-	if (action) {
-		iint = integrity_inode_get(inode);
-		if (!iint)
-			rc = -ENOMEM;
-	}
-
-	if (!rc && violation_check)
+	if (violation_check)
 		ima_rdwr_violation_check(file, iint, action & IMA_MEASURE,
 					 &pathbuf, &pathname, filename);
 
 	inode_unlock(inode);
 
-	if (rc)
-		goto out;
 	if (!action)
 		goto out;
 
@@ -564,21 +549,11 @@ static int ima_file_check(struct file *file, int mask)
 static int __ima_inode_hash(struct inode *inode, struct file *file, char *buf,
 			    size_t buf_size)
 {
-	struct integrity_iint_cache *iint = NULL, tmp_iint;
+	struct ima_iint_cache *iint = ima_iint_inode(inode), tmp_iint;
 	int rc, hash_algo;
 
-	if (ima_policy_flag) {
-		iint = integrity_iint_find(inode);
-		if (iint)
-			mutex_lock(&iint->mutex);
-	}
-
-	if ((!iint || !(iint->flags & IMA_COLLECTED)) && file) {
-		if (iint)
-			mutex_unlock(&iint->mutex);
-
+	if (!(iint->flags & IMA_COLLECTED) && file) {
 		memset(&tmp_iint, 0, sizeof(tmp_iint));
-		tmp_iint.inode = inode;
 		mutex_init(&tmp_iint.mutex);
 
 		rc = ima_collect_measurement(&tmp_iint, file, NULL, 0,
@@ -592,11 +567,9 @@ static int __ima_inode_hash(struct inode *inode, struct file *file, char *buf,
 		}
 
 		iint = &tmp_iint;
-		mutex_lock(&iint->mutex);
 	}
 
-	if (!iint)
-		return -EOPNOTSUPP;
+	mutex_lock(&iint->mutex);
 
 	/*
 	 * ima_file_hash can be called when ima_collect_measurement has still
@@ -688,7 +661,7 @@ static void ima_post_create_tmpfile(struct mnt_idmap *idmap,
 				    struct inode *inode)
 
 {
-	struct integrity_iint_cache *iint;
+	struct ima_iint_cache *iint = ima_iint_inode(inode);
 	int must_appraise;
 
 	if (!ima_policy_flag || !S_ISREG(inode->i_mode))
@@ -697,11 +670,6 @@ static void ima_post_create_tmpfile(struct mnt_idmap *idmap,
 	must_appraise = ima_must_appraise(idmap, inode, MAY_ACCESS,
 					  FILE_CHECK);
 	if (!must_appraise)
-		return;
-
-	/* Nothing to do if we can't allocate memory */
-	iint = integrity_inode_get(inode);
-	if (!iint)
 		return;
 
 	/* needed for writing the security xattrs */
@@ -720,8 +688,8 @@ static void ima_post_create_tmpfile(struct mnt_idmap *idmap,
 static void __maybe_unused
 ima_post_path_mknod(struct mnt_idmap *idmap, struct dentry *dentry)
 {
-	struct integrity_iint_cache *iint;
 	struct inode *inode = dentry->d_inode;
+	struct ima_iint_cache *iint = ima_iint_inode(inode);
 	int must_appraise;
 
 	if (!ima_policy_flag || !S_ISREG(inode->i_mode))
@@ -730,11 +698,6 @@ ima_post_path_mknod(struct mnt_idmap *idmap, struct dentry *dentry)
 	must_appraise = ima_must_appraise(idmap, inode, MAY_ACCESS,
 					  FILE_CHECK);
 	if (!must_appraise)
-		return;
-
-	/* Nothing to do if we can't allocate memory */
-	iint = integrity_inode_get(inode);
-	if (!iint)
 		return;
 
 	/* needed for re-opening empty files */
@@ -936,7 +899,7 @@ int process_buffer_measurement(struct mnt_idmap *idmap,
 	int ret = 0;
 	const char *audit_cause = "ENOMEM";
 	struct ima_template_entry *entry = NULL;
-	struct integrity_iint_cache iint = {};
+	struct ima_iint_cache iint = {};
 	struct ima_event_data event_data = {.iint = &iint,
 					    .filename = eventname,
 					    .buf = buf,
@@ -1145,6 +1108,48 @@ static int __maybe_unused ima_kernel_module_request(char *kmod_name)
 	return 0;
 }
 
+#define IMA_MAX_NESTING (FILESYSTEM_MAX_STACK_DEPTH + 1)
+
+/*
+ * It is not clear that IMA should be nested at all, but as long is it measures
+ * files both on overlayfs and on underlying fs, we need to annotate the iint
+ * mutex to avoid lockdep false positives related to IMA + overlayfs.
+ * See ovl_lockdep_annotate_inode_mutex_key() for more details.
+ */
+static inline void ima_iint_lockdep_annotate(struct ima_iint_cache *ima_iint,
+					     struct inode *inode)
+{
+#ifdef CONFIG_LOCKDEP
+	static struct lock_class_key iint_mutex_key[IMA_MAX_NESTING];
+
+	int depth = inode->i_sb->s_stack_depth;
+
+	if (WARN_ON_ONCE(depth < 0 || depth >= IMA_MAX_NESTING))
+		depth = 0;
+
+	lockdep_set_class(&ima_iint->mutex, &iint_mutex_key[depth]);
+#endif
+}
+
+static int ima_inode_alloc_security(struct inode *inode)
+{
+	struct ima_iint_cache *iint = ima_iint_inode(inode);
+
+	iint->ima_hash = NULL;
+	iint->version = 0;
+	iint->flags = 0UL;
+	iint->atomic_flags = 0UL;
+	iint->ima_file_status = INTEGRITY_UNKNOWN;
+	iint->ima_mmap_status = INTEGRITY_UNKNOWN;
+	iint->ima_bprm_status = INTEGRITY_UNKNOWN;
+	iint->ima_read_status = INTEGRITY_UNKNOWN;
+	iint->ima_creds_status = INTEGRITY_UNKNOWN;
+	iint->measured_pcrs = 0;
+	mutex_init(&iint->mutex);
+	ima_iint_lockdep_annotate(iint, inode);
+	return 0;
+}
+
 static struct security_hook_list ima_hooks[] __ro_after_init = {
 	LSM_HOOK_INIT(bprm_check_security, ima_bprm_check),
 	LSM_HOOK_INIT(file_post_open, ima_file_check),
@@ -1156,6 +1161,7 @@ static struct security_hook_list ima_hooks[] __ro_after_init = {
 	LSM_HOOK_INIT(kernel_post_load_data, ima_post_load_data),
 	LSM_HOOK_INIT(kernel_read_file, ima_read_file),
 	LSM_HOOK_INIT(kernel_post_read_file, ima_post_read_file),
+	LSM_HOOK_INIT(inode_alloc_security, ima_inode_alloc_security),
 #ifdef CONFIG_SECURITY_PATH
 	LSM_HOOK_INIT(path_post_mknod, ima_post_path_mknod),
 #endif
@@ -1179,10 +1185,15 @@ static int __init init_ima_lsm(void)
 	return 0;
 }
 
+struct lsm_blob_sizes ima_blob_sizes __ro_after_init = {
+	.lbs_inode = sizeof(struct ima_iint_cache),
+};
+
 DEFINE_LSM(ima) = {
 	.name = "ima",
 	.init = init_ima_lsm,
 	.order = LSM_ORDER_LAST,
+	.blobs = &ima_blob_sizes,
 };
 
 late_initcall(init_ima);	/* Start IMA after the TPM is available */
