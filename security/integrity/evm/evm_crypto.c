@@ -322,12 +322,14 @@ int evm_calc_hash(struct dentry *dentry, const char *req_xattr_name,
 static int evm_is_immutable(struct dentry *dentry, struct inode *inode)
 {
 	const struct evm_ima_xattr_data *xattr_data = NULL;
-	struct integrity_iint_cache *iint;
+	struct evm_iint_cache *iint = evm_iint_inode(inode);
 	int rc = 0;
 
-	iint = integrity_iint_find(inode);
-	if (iint && (iint->flags & EVM_IMMUTABLE_DIGSIG))
+	if (iint->flags & EVM_IMMUTABLE_DIGSIG)
 		return 1;
+
+	if (iint->flags & EVM_IMMUTABLE_DIGSIG_CHECKED)
+		return 0;
 
 	/* Do this the hard way */
 	rc = vfs_getxattr_alloc(&nop_mnt_idmap, dentry, XATTR_NAME_EVM,
@@ -337,12 +339,15 @@ static int evm_is_immutable(struct dentry *dentry, struct inode *inode)
 			rc = 0;
 		goto out;
 	}
-	if (xattr_data->type == EVM_XATTR_PORTABLE_DIGSIG)
+	if (xattr_data->type == EVM_XATTR_PORTABLE_DIGSIG) {
+		iint->flags |= EVM_IMMUTABLE_DIGSIG;
 		rc = 1;
-	else
+	} else {
 		rc = 0;
+	}
 
 out:
+	iint->flags |= EVM_IMMUTABLE_DIGSIG_CHECKED;
 	kfree(xattr_data);
 	return rc;
 }

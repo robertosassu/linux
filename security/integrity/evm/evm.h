@@ -32,6 +32,24 @@ struct xattr_list {
 	bool enabled;
 };
 
+#define EVM_NEW_FILE			0x00000001
+#define EVM_IMMUTABLE_DIGSIG		0x00000002
+/* To call vfs_getxattr_alloc() once in evm_is_immutable() */
+#define EVM_IMMUTABLE_DIGSIG_CHECKED	0x00000004
+
+/* EVM integrity metadata associated with an inode */
+struct evm_iint_cache {
+	unsigned long flags;
+	enum integrity_status evm_status:4;
+};
+
+extern struct lsm_blob_sizes evm_blob_sizes;
+
+static inline struct evm_iint_cache *evm_iint_inode(const struct inode *inode)
+{
+	return inode->i_security + evm_blob_sizes.lbs_inode;
+}
+
 extern int evm_initialized;
 
 #define EVM_ATTR_FSUUID		0x0001
