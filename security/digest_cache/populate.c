@@ -12,6 +12,7 @@
 #include <linux/kernel_read_file.h>
 
 #include "internal.h"
+#include "parsers/parsers.h"
 
 /**
  * digest_cache_parse_digest_list - Parse a digest list
@@ -64,6 +65,9 @@ static int digest_cache_parse_digest_list(struct digest_cache *digest_cache,
 	pr_debug("Parsing %s%s%s, format: %.*s, size: %ld\n", path_str,
 		 filename[0] ? "/" : "", filename, (int)(next_sep - format),
 		 format, data_len);
+
+	if (!strncmp(format, "tlv-", 4))
+		ret = digest_list_parse_tlv(digest_cache, data, data_len);
 
 	return ret;
 }
