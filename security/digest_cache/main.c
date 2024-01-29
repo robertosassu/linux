@@ -172,6 +172,17 @@ struct digest_cache *digest_cache_create(struct dentry *dentry,
 	set_bit(INIT_IN_PROGRESS, &dig_sec->dig_owner->flags);
 	mutex_unlock(&dig_sec->dig_owner_mutex);
 
+	if (S_ISREG(inode->i_mode)) {
+		ret = digest_cache_populate(digest_cache, digest_list_path,
+					    path_str, filename);
+		if (ret < 0) {
+			pr_debug("Failed to populate digest cache %s ret: %d (keep digest cache)\n",
+				 digest_cache->path_str, ret);
+			/* Prevent usage of partially-populated digest cache. */
+			set_bit(INVALID, &digest_cache->flags);
+		}
+	}
+
 	/* Creation complete, notify the other lock contenders. */
 	clear_and_wake_up_bit(INIT_IN_PROGRESS, &dig_sec->dig_owner->flags);
 exists:
@@ -179,6 +190,13 @@ exists:
 		/* Wait until creation complete. */
 		wait_on_bit(&dig_sec->dig_owner->flags, INIT_IN_PROGRESS,
 			    TASK_UNINTERRUPTIBLE);
+
+	if (test_bit(INVALID, &digest_cache->flags)) {
+		pr_debug("Digest cache %s is invalid, don't return it\n",
+			 digest_cache->path_str);
+		digest_cache_put(digest_cache);
+		digest_cache = NULL;
+	}
 out:
 	if (digest_list_path == &file_path)
 		path_put(&file_path);
