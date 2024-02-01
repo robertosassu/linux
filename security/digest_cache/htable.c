@@ -8,6 +8,8 @@
  */
 
 #define pr_fmt(fmt) "DIGEST CACHE: "fmt
+#include <linux/namei.h>
+
 #include "internal.h"
 
 /**
@@ -210,10 +212,26 @@ digest_cache_found_t digest_cache_lookup(struct dentry *dentry,
 					 struct digest_cache *digest_cache,
 					 u8 *digest, enum hash_algo algo)
 {
+	struct path digest_list_path;
+	digest_cache_found_t found;
 	int ret;
 
-	ret = digest_cache_htable_lookup(dentry, digest_cache, digest, algo);
-	return (!ret) ? (digest_cache_found_t)digest_cache : 0UL;
+	if (!test_bit(IS_DIR, &digest_cache->flags)) {
+		ret = digest_cache_htable_lookup(dentry, digest_cache, digest,
+						 algo);
+		return (!ret) ? (digest_cache_found_t)digest_cache : 0UL;
+	}
+
+	ret = kern_path(digest_cache->path_str, 0, &digest_list_path);
+	if (ret < 0) {
+		pr_debug("Cannot find path %s\n", digest_cache->path_str);
+		return 0UL;
+	}
+
+	found = digest_cache_dir_lookup_digest(dentry, &digest_list_path,
+					       digest_cache, digest, algo);
+	path_put(&digest_list_path);
+	return found;
 }
 EXPORT_SYMBOL_GPL(digest_cache_lookup);
 

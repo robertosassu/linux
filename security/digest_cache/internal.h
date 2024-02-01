@@ -16,6 +16,39 @@
 /* Digest cache bits in flags. */
 #define INIT_IN_PROGRESS	0	/* Digest cache being initialized. */
 #define INVALID			1	/* Digest cache marked as invalid. */
+#define IS_DIR			2	/* Digest cache created from dir. */
+
+/**
+ * struct readdir_callback - Structure to store information for dir iteration
+ * @ctx: Context structure
+ * @head: Head of linked list of directory entries
+ *
+ * This structure stores information to be passed from the iterate_dir() caller
+ * to the directory iterator.
+ */
+struct readdir_callback {
+	struct dir_context ctx;
+	struct list_head *head;
+};
+
+/**
+ * struct dir_entry - Directory entry
+ * @list: Linked list of directory entries
+ * @digest_cache: Digest cache associated to the directory entry
+ * @digest_cache_mutex: Protects @digest_cache
+ * @seq_num: Sequence number of the directory entry from file name
+ * @name: File name of the directory entry
+ *
+ * This structure represents a directory entry with a digest cache created
+ * from that entry.
+ */
+struct dir_entry {
+	struct list_head list;
+	struct digest_cache *digest_cache;
+	struct mutex digest_cache_mutex;
+	unsigned int seq_num;
+	char name[];
+} __packed;
 
 /**
  * struct digest_cache_verif
@@ -83,6 +116,7 @@ struct htable {
 /**
  * struct digest_cache - Digest cache
  * @htables: Hash tables (one per algorithm)
+ * @dir_entries: List of files in a directory and the digest cache
  * @ref_count: Number of references to the digest cache
  * @path_str: Path of the digest list the digest cache was created from
  * @flags: Control flags
@@ -93,6 +127,7 @@ struct htable {
  */
 struct digest_cache {
 	struct list_head htables;
+	struct list_head dir_entries;
 	atomic_t ref_count;
 	char *path_str;
 	unsigned long flags;
@@ -192,5 +227,15 @@ size_t digest_cache_strip_modsig(__u8 *data, size_t data_len);
 
 /* verif.c */
 void digest_cache_verif_free(struct digest_cache *digest_cache);
+
+/* dir.c */
+int digest_cache_dir_create(struct digest_cache *digest_cache,
+			    struct path *digest_list_path);
+digest_cache_found_t
+digest_cache_dir_lookup_digest(struct dentry *dentry,
+			       struct path *digest_list_path,
+			       struct digest_cache *digest_cache, u8 *digest,
+			       enum hash_algo algo);
+void digest_cache_dir_free(struct digest_cache *digest_cache);
 
 #endif /* _DIGEST_CACHE_INTERNAL_H */

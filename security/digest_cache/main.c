@@ -51,6 +51,7 @@ static struct digest_cache *digest_cache_alloc_init(char *path_str,
 	INIT_LIST_HEAD(&digest_cache->htables);
 	INIT_LIST_HEAD(&digest_cache->verif_data);
 	spin_lock_init(&digest_cache->verif_data_lock);
+	INIT_LIST_HEAD(&digest_cache->dir_entries);
 
 	pr_debug("New digest cache %s (ref count: %d)\n",
 		 digest_cache->path_str, atomic_read(&digest_cache->ref_count));
@@ -68,6 +69,7 @@ static void digest_cache_free(struct digest_cache *digest_cache)
 {
 	digest_cache_htable_free(digest_cache);
 	digest_cache_verif_free(digest_cache);
+	digest_cache_dir_free(digest_cache);
 
 	pr_debug("Freed digest cache %s\n", digest_cache->path_str);
 	kfree(digest_cache->path_str);
@@ -183,6 +185,16 @@ struct digest_cache *digest_cache_create(struct dentry *dentry,
 				 digest_cache->path_str, ret);
 			/* Prevent usage of partially-populated digest cache. */
 			set_bit(INVALID, &digest_cache->flags);
+		}
+	} else if (S_ISDIR(inode->i_mode)) {
+		set_bit(IS_DIR, &dig_sec->dig_owner->flags);
+
+		ret = digest_cache_dir_create(digest_cache, digest_list_path);
+		if (ret < 0) {
+			pr_debug("Failed to create dir digest cache, ret: %d (keep digest cache)\n",
+				 ret);
+			/* Prevent usage of partially-populated digest cache. */
+			set_bit(INVALID, &dig_sec->dig_owner->flags);
 		}
 	}
 
