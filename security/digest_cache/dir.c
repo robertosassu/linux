@@ -148,6 +148,12 @@ digest_cache_dir_lookup_digest(struct dentry *dentry,
 
 	list_for_each_entry(dir_entry, &digest_cache->dir_entries, list) {
 		mutex_lock(&dir_entry->digest_cache_mutex);
+		if (dir_entry->digest_cache &&
+		    test_bit(RESET, &dir_entry->digest_cache->flags)) {
+			digest_cache_put(dir_entry->digest_cache);
+			dir_entry->digest_cache = NULL;
+		}
+
 		if (!dir_entry->digest_cache) {
 			cache = digest_cache_create(dentry, digest_list_path,
 						    digest_cache->path_str,

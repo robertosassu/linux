@@ -4,7 +4,8 @@
 
 obj-$(CONFIG_SECURITY_DIGEST_CACHE) += digest_cache.o
 
-digest_cache-y := main.o secfs.o htable.o populate.o modsig.o verif.o dir.o
+digest_cache-y := main.o secfs.o htable.o populate.o modsig.o verif.o dir.o \
+		  reset.o
 
 digest_cache-y += parsers/tlv.o
 digest_cache-y += parsers/rpm.o

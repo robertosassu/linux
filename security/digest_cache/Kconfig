@@ -2,6 +2,7 @@
 config SECURITY_DIGEST_CACHE
 	bool "Digest_cache LSM"
 	select TLV_PARSER
+	select SECURITY_PATH
 	default n
 	help
 	  This option enables an LSM maintaining a cache of digests

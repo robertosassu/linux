@@ -48,6 +48,8 @@ int digest_cache_verif_set(struct file *file, const char *verif_id, void *data,
 			   size_t size);
 void *digest_cache_verif_get(struct digest_cache *digest_cache,
 			     const char *verif_id);
+bool digest_cache_changed(struct inode *inode,
+			  struct digest_cache *digest_cache);
 
 #else
 static inline struct digest_cache *digest_cache_get(struct dentry *dentry)
@@ -77,6 +79,12 @@ static inline void *digest_cache_verif_get(struct digest_cache *digest_cache,
 					   const char *verif_id)
 {
 	return NULL;
+}
+
+static inline bool digest_cache_changed(struct inode *inode,
+					struct digest_cache *digest_cache)
+{
+	return false;
 }
 
 #endif /* CONFIG_SECURITY_DIGEST_CACHE */

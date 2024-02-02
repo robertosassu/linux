@@ -168,6 +168,11 @@ struct digest_cache *digest_cache_create(struct dentry *dentry,
 
 	/* Serialize check and assignment of dig_owner. */
 	mutex_lock(&dig_sec->dig_owner_mutex);
+	if (dig_sec->dig_owner && test_bit(RESET, &dig_sec->dig_owner->flags)) {
+		digest_cache_put(dig_sec->dig_owner);
+		dig_sec->dig_owner = NULL;
+	}
+
 	if (dig_sec->dig_owner) {
 		/* Increment ref. count for reference returned to the caller. */
 		digest_cache = digest_cache_ref(dig_sec->dig_owner);
@@ -400,6 +405,11 @@ struct digest_cache *digest_cache_get(struct dentry *dentry)
 
 	/* Serialize accesses to inode for which the digest cache is used. */
 	mutex_lock(&dig_sec->dig_user_mutex);
+	if (dig_sec->dig_user && test_bit(RESET, &dig_sec->dig_user->flags)) {
+		digest_cache_put(dig_sec->dig_user);
+		dig_sec->dig_user = NULL;
+	}
+
 	if (!dig_sec->dig_user) {
 		down_read(&default_path_sem);
 		/* Consume extra reference from digest_cache_create(). */
@@ -488,6 +498,14 @@ static void digest_cache_inode_free_security(struct inode *inode)
 static struct security_hook_list digest_cache_hooks[] __ro_after_init = {
 	LSM_HOOK_INIT(inode_alloc_security, digest_cache_inode_alloc_security),
 	LSM_HOOK_INIT(inode_free_security, digest_cache_inode_free_security),
+	LSM_HOOK_INIT(file_open, digest_cache_file_open),
+	LSM_HOOK_INIT(path_truncate, digest_cache_path_truncate),
+	LSM_HOOK_INIT(file_release, digest_cache_file_release),
+	LSM_HOOK_INIT(inode_unlink, digest_cache_inode_unlink),
+	LSM_HOOK_INIT(inode_rename, digest_cache_inode_rename),
+	LSM_HOOK_INIT(inode_post_setxattr, digest_cache_inode_post_setxattr),
+	LSM_HOOK_INIT(inode_post_removexattr,
+		      digest_cache_inode_post_removexattr),
 };
 
 /**
