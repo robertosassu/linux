@@ -44,6 +44,10 @@ void digest_cache_put(struct digest_cache *digest_cache);
 digest_cache_found_t digest_cache_lookup(struct dentry *dentry,
 					 struct digest_cache *digest_cache,
 					 u8 *digest, enum hash_algo algo);
+int digest_cache_verif_set(struct file *file, const char *verif_id, void *data,
+			   size_t size);
+void *digest_cache_verif_get(struct digest_cache *digest_cache,
+			     const char *verif_id);
 
 #else
 static inline struct digest_cache *digest_cache_get(struct dentry *dentry)
@@ -60,6 +64,19 @@ digest_cache_lookup(struct dentry *dentry, struct digest_cache *digest_cache,
 		    u8 *digest, enum hash_algo algo)
 {
 	return 0UL;
+}
+
+static inline int digest_cache_verif_set(struct file *file,
+					 const char *verif_id, void *data,
+					 size_t size)
+{
+	return -EOPNOTSUPP;
+}
+
+static inline void *digest_cache_verif_get(struct digest_cache *digest_cache,
+					   const char *verif_id)
+{
+	return NULL;
 }
 
 #endif /* CONFIG_SECURITY_DIGEST_CACHE */

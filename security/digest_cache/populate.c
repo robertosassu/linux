@@ -123,6 +123,8 @@ int digest_cache_populate(struct digest_cache *digest_cache,
 		return PTR_ERR(file);
 	}
 
+	digest_cache_to_file_sec(file, digest_cache);
+
 	w.data = NULL;
 	w.file = file;
 	INIT_WORK_ONSTACK(&w.work, digest_cache_read_digest_list);
