@@ -248,7 +248,7 @@ static int process_measurement(struct file *file, const struct cred *cred,
 	inode_lock(inode);
 
 	if (action) {
-		iint = ima_inode_get(inode);
+		iint = ima_inode_get(inode, func == DIGEST_LIST_CHECK);
 		if (!iint)
 			rc = -ENOMEM;
 	}
@@ -699,7 +699,7 @@ static void ima_post_create_tmpfile(struct mnt_idmap *idmap,
 		return;
 
 	/* Nothing to do if we can't allocate memory */
-	iint = ima_inode_get(inode);
+	iint = ima_inode_get(inode, false);
 	if (!iint)
 		return;
 
@@ -731,7 +731,7 @@ static void ima_post_path_mknod(struct mnt_idmap *idmap, struct dentry *dentry)
 		return;
 
 	/* Nothing to do if we can't allocate memory */
-	iint = ima_inode_get(inode);
+	iint = ima_inode_get(inode, false);
 	if (!iint)
 		return;
 

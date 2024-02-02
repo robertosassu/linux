@@ -41,7 +41,7 @@ struct ima_iint_cache *ima_iint_find(struct inode *inode)
  * See ovl_lockdep_annotate_inode_mutex_key() for more details.
  */
 static inline void ima_iint_lockdep_annotate(struct ima_iint_cache *iint,
-					     struct inode *inode)
+					     struct inode *inode, bool nested)
 {
 #ifdef CONFIG_LOCKDEP
 	static struct lock_class_key ima_iint_mutex_key[IMA_MAX_NESTING];
@@ -56,7 +56,7 @@ static inline void ima_iint_lockdep_annotate(struct ima_iint_cache *iint,
 }
 
 static void ima_iint_init_always(struct ima_iint_cache *iint,
-				 struct inode *inode)
+				 struct inode *inode, bool nested)
 {
 	iint->ima_hash = NULL;
 	iint->version = 0;
@@ -69,7 +69,7 @@ static void ima_iint_init_always(struct ima_iint_cache *iint,
 	iint->ima_creds_status = INTEGRITY_UNKNOWN;
 	iint->measured_pcrs = 0;
 	mutex_init(&iint->mutex);
-	ima_iint_lockdep_annotate(iint, inode);
+	ima_iint_lockdep_annotate(iint, inode, nested);
 }
 
 static void ima_iint_free(struct ima_iint_cache *iint)
@@ -82,13 +82,14 @@ static void ima_iint_free(struct ima_iint_cache *iint)
 /**
  * ima_inode_get - Find or allocate an iint associated with an inode
  * @inode: Pointer to the inode
+ * @nested: Whether or not the iint->mutex lock can be nested
  *
  * Find an iint associated with an inode, and allocate a new one if not found.
  * Caller must lock i_mutex.
  *
  * Return: An iint on success, NULL on error.
  */
-struct ima_iint_cache *ima_inode_get(struct inode *inode)
+struct ima_iint_cache *ima_inode_get(struct inode *inode, bool nested)
 {
 	struct ima_iint_cache *iint;
 
@@ -100,7 +101,7 @@ struct ima_iint_cache *ima_inode_get(struct inode *inode)
 	if (!iint)
 		return NULL;
 
-	ima_iint_init_always(iint, inode);
+	ima_iint_init_always(iint, inode, nested);
 
 	inode->i_flags |= S_IMA;
 	ima_inode_set_iint(inode, iint);

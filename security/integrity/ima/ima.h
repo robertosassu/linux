@@ -216,7 +216,7 @@ static inline void ima_inode_set_iint(const struct inode *inode,
 }
 
 struct ima_iint_cache *ima_iint_find(struct inode *inode);
-struct ima_iint_cache *ima_inode_get(struct inode *inode);
+struct ima_iint_cache *ima_inode_get(struct inode *inode, bool nested);
 void ima_inode_free(struct inode *inode);
 void __init ima_iintcache_init(void);
 
