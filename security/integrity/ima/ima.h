@@ -20,6 +20,7 @@
 #include <linux/hash.h>
 #include <linux/tpm.h>
 #include <linux/audit.h>
+#include <linux/digest_cache.h>
 #include <crypto/hash_info.h>
 
 #include "../integrity.h"

@@ -214,7 +214,7 @@ static int process_measurement(struct file *file, const struct cred *cred,
 	char *pathbuf = NULL;
 	char filename[NAME_MAX];
 	const char *pathname = NULL;
-	int rc = 0, action, must_appraise = 0;
+	int rc = 0, digest_cache_rc, action, must_appraise = 0;
 	int pcr = CONFIG_IMA_MEASURE_PCR_IDX;
 	struct evm_ima_xattr_data *xattr_value = NULL;
 	struct modsig *modsig = NULL;
@@ -222,6 +222,7 @@ static int process_measurement(struct file *file, const struct cred *cred,
 	bool violation_check;
 	enum hash_algo hash_algo;
 	unsigned int allowed_algos = 0;
+	u64 verif_mask = 0;
 
 	if (!ima_policy_flag || !S_ISREG(inode->i_mode))
 		return 0;
@@ -399,6 +400,22 @@ out_locked:
 	if ((mask & MAY_WRITE) && test_bit(IMA_DIGSIG, &iint->atomic_flags) &&
 	     !(iint->flags & IMA_NEW_FILE))
 		rc = -EACCES;
+	if (!rc && func == DIGEST_LIST_CHECK) {
+		if (iint->flags & IMA_MEASURED)
+			verif_mask |= IMA_DIGEST_CACHE_MEASURE_CONTENT;
+		if (iint->flags & IMA_APPRAISED_SUBMASK)
+			verif_mask |= IMA_DIGEST_CACHE_APPRAISE_CONTENT;
+
+		/* Remember actions done on digest list for later use. */
+		digest_cache_rc = digest_cache_verif_set(file, "ima",
+							 &verif_mask,
+							 sizeof(verif_mask));
+		/* Ignore if fd doesn't have digest cache set (prefetching). */
+		if (digest_cache_rc && digest_cache_rc != -ENOENT)
+			pr_debug("Cannot set verification mask for %s, ret: %d, ignoring\n",
+				 file_dentry(file)->d_name.name,
+				 digest_cache_rc);
+	}
 	mutex_unlock(&iint->mutex);
 	kfree(xattr_value);
 	ima_free_modsig(modsig);
