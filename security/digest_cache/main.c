@@ -18,6 +18,9 @@ static struct kmem_cache *digest_cache_cache __read_mostly;
 
 char *default_path_str = CONFIG_DIGEST_LIST_DEFAULT_PATH;
 
+/* Protects default_path_str. */
+struct rw_semaphore default_path_sem;
+
 /**
  * digest_cache_alloc_init - Allocate and initialize a new digest cache
  * @path_str: Path string of the digest list
@@ -273,9 +276,12 @@ struct digest_cache *digest_cache_get(struct dentry *dentry)
 
 	/* Serialize accesses to inode for which the digest cache is used. */
 	mutex_lock(&dig_sec->dig_user_mutex);
-	if (!dig_sec->dig_user)
+	if (!dig_sec->dig_user) {
+		down_read(&default_path_sem);
 		/* Consume extra reference from digest_cache_create(). */
 		dig_sec->dig_user = digest_cache_new(dentry);
+		up_read(&default_path_sem);
+	}
 
 	if (dig_sec->dig_user)
 		/* Increment ref. count for reference returned to the caller. */
@@ -385,6 +391,8 @@ static const struct lsm_id digest_cache_lsmid = {
  */
 static int __init digest_cache_init(void)
 {
+	init_rwsem(&default_path_sem);
+
 	digest_cache_cache = kmem_cache_create("digest_cache_cache",
 					       sizeof(struct digest_cache),
 					       0, SLAB_PANIC,

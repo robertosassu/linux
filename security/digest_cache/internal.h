@@ -49,6 +49,7 @@ struct digest_cache_security {
 
 extern struct lsm_blob_sizes digest_cache_blob_sizes;
 extern char *default_path_str;
+extern struct rw_semaphore default_path_sem;
 
 static inline struct digest_cache_security *
 digest_cache_get_security(const struct inode *inode)

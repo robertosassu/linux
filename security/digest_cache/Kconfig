@@ -14,3 +14,7 @@ config DIGEST_LIST_DEFAULT_PATH
 	default "/etc/digest_lists"
 	help
 	  Default directory where digest_cache LSM expects to find digest lists.
+
+	  It can be changed at run-time, by writing the new path to the
+	  securityfs interface. Digest caches created with the old path are
+	  not affected by the change.
