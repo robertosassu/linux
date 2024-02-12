@@ -222,7 +222,9 @@ static int process_measurement(struct file *file, const struct cred *cred,
 	bool violation_check;
 	enum hash_algo hash_algo;
 	unsigned int allowed_algos = 0;
-	u64 verif_mask = 0;
+	u64 verif_mask = 0, *verif_mask_ptr, policy_mask = 0, allow_mask = 0;
+	struct digest_cache *digest_cache = NULL, *found_cache;
+	digest_cache_found_t found;
 
 	if (!ima_policy_flag || !S_ISREG(inode->i_mode))
 		return 0;
@@ -233,7 +235,7 @@ static int process_measurement(struct file *file, const struct cred *cred,
 	 */
 	action = ima_get_action(file_mnt_idmap(file), inode, cred, secid,
 				mask, func, &pcr, &template_desc, NULL,
-				&allowed_algos, NULL);
+				&allowed_algos, &policy_mask);
 	violation_check = ((func == FILE_CHECK || func == MMAP_CHECK ||
 			    func == MMAP_CHECK_REQPROT) &&
 			   (ima_policy_flag & IMA_MEASURE));
@@ -364,10 +366,29 @@ static int process_measurement(struct file *file, const struct cred *cred,
 	if (!pathbuf)	/* ima_rdwr_violation possibly pre-fetched */
 		pathname = ima_d_path(&file->f_path, &pathbuf, filename);
 
+	if (rc == 0 && policy_mask)
+		digest_cache = digest_cache_get(file_dentry(file));
+
+	if (digest_cache) {
+		found = digest_cache_lookup(file_dentry(file), digest_cache,
+					    iint->ima_hash->digest,
+					    iint->ima_hash->algo);
+		/* AND what is allowed by the policy, and what IMA verified. */
+		if (found) {
+			found_cache = digest_cache_from_found_t(found);
+			verif_mask_ptr = digest_cache_verif_get(found_cache,
+								"ima");
+			if (verif_mask_ptr)
+				allow_mask = policy_mask & *verif_mask_ptr;
+		}
+
+		digest_cache_put(digest_cache);
+	}
+
 	if (action & IMA_MEASURE)
 		ima_store_measurement(iint, file, pathname,
 				      xattr_value, xattr_len, modsig, pcr,
-				      template_desc);
+				      template_desc, allow_mask);
 	if (rc == 0 && (action & IMA_APPRAISE_SUBMASK)) {
 		rc = ima_check_blacklist(iint, modsig, pcr);
 		if (rc != -EPERM) {

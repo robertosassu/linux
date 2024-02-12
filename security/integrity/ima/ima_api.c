@@ -345,7 +345,8 @@ void ima_store_measurement(struct ima_iint_cache *iint, struct file *file,
 			   const unsigned char *filename,
 			   struct evm_ima_xattr_data *xattr_value,
 			   int xattr_len, const struct modsig *modsig, int pcr,
-			   struct ima_template_desc *template_desc)
+			   struct ima_template_desc *template_desc,
+			   u64 digest_cache_mask)
 {
 	static const char op[] = "add_template_measure";
 	static const char audit_cause[] = "ENOMEM";
@@ -368,6 +369,18 @@ void ima_store_measurement(struct ima_iint_cache *iint, struct file *file,
 	 */
 	if (iint->measured_pcrs & (0x1 << pcr) && !modsig)
 		return;
+
+	/*
+	 * If digest cache usage was authorized with the IMA policy, the digest
+	 * list the digest cache was populated from was measured, and the file
+	 * digest was found in the digest cache, mark the file as successfully
+	 * measured.
+	 */
+	if (digest_cache_mask & IMA_DIGEST_CACHE_MEASURE_CONTENT) {
+		iint->flags |= IMA_MEASURED;
+		iint->measured_pcrs |= (0x1 << pcr);
+		return;
+	}
 
 	result = ima_alloc_init_template(&event_data, &entry, template_desc);
 	if (result < 0) {
