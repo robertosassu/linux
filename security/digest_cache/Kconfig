@@ -18,3 +18,14 @@ config DIGEST_LIST_DEFAULT_PATH
 	  It can be changed at run-time, by writing the new path to the
 	  securityfs interface. Digest caches created with the old path are
 	  not affected by the change.
+
+config DIGEST_CACHE_HTABLE_DEPTH
+	int
+	default 30
+	help
+	  Desired average depth of the collision list in the digest cache
+	  hash tables.
+
+	  A smaller number will increase the amount of hash table slots, and
+	  make the search faster. A bigger number will decrease the number of
+	  hash table slots, but make the search slower.

@@ -11,12 +11,39 @@
 #define _LINUX_DIGEST_CACHE_H
 
 #include <linux/fs.h>
+#include <crypto/hash_info.h>
 
 struct digest_cache;
+
+/**
+ * typedef digest_cache_found_t - Digest cache reference as numeric value
+ *
+ * This new type represents a digest cache reference that should not be put.
+ */
+typedef unsigned long digest_cache_found_t;
+
+/**
+ * digest_cache_from_found_t - Convert digest_cache_found_t to digest cache ptr
+ * @found: digest_cache_found_t value
+ *
+ * Convert the digest_cache_found_t returned by digest_cache_lookup() to a
+ * digest cache pointer, so that it can be passed to the other functions of the
+ * API.
+ *
+ * Return: Digest cache pointer.
+ */
+static inline struct digest_cache *
+digest_cache_from_found_t(digest_cache_found_t found)
+{
+	return (struct digest_cache *)found;
+}
 
 #ifdef CONFIG_SECURITY_DIGEST_CACHE
 struct digest_cache *digest_cache_get(struct dentry *dentry);
 void digest_cache_put(struct digest_cache *digest_cache);
+digest_cache_found_t digest_cache_lookup(struct dentry *dentry,
+					 struct digest_cache *digest_cache,
+					 u8 *digest, enum hash_algo algo);
 
 #else
 static inline struct digest_cache *digest_cache_get(struct dentry *dentry)
@@ -26,6 +53,13 @@ static inline struct digest_cache *digest_cache_get(struct dentry *dentry)
 
 static inline void digest_cache_put(struct digest_cache *digest_cache)
 {
+}
+
+static inline digest_cache_found_t
+digest_cache_lookup(struct dentry *dentry, struct digest_cache *digest_cache,
+		    u8 *digest, enum hash_algo algo)
+{
+	return 0UL;
 }
 
 #endif /* CONFIG_SECURITY_DIGEST_CACHE */

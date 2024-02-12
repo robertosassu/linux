@@ -48,6 +48,7 @@ static struct digest_cache *digest_cache_alloc_init(char *path_str,
 
 	atomic_set(&digest_cache->ref_count, 1);
 	digest_cache->flags = 0UL;
+	INIT_LIST_HEAD(&digest_cache->htables);
 
 	pr_debug("New digest cache %s (ref count: %d)\n",
 		 digest_cache->path_str, atomic_read(&digest_cache->ref_count));
@@ -63,6 +64,8 @@ static struct digest_cache *digest_cache_alloc_init(char *path_str,
  */
 static void digest_cache_free(struct digest_cache *digest_cache)
 {
+	digest_cache_htable_free(digest_cache);
+
 	pr_debug("Freed digest cache %s\n", digest_cache->path_str);
 	kfree(digest_cache->path_str);
 	kmem_cache_free(digest_cache_cache, digest_cache);
