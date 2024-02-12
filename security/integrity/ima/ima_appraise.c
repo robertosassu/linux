@@ -478,7 +478,8 @@ int ima_check_blacklist(struct ima_iint_cache *iint,
 int ima_appraise_measurement(enum ima_hooks func, struct ima_iint_cache *iint,
 			     struct file *file, const unsigned char *filename,
 			     struct evm_ima_xattr_data *xattr_value,
-			     int xattr_len, const struct modsig *modsig)
+			     int xattr_len, const struct modsig *modsig,
+			     u64 digest_cache_mask)
 {
 	static const char op[] = "appraise_data";
 	const char *cause = "unknown";
@@ -489,11 +490,12 @@ int ima_appraise_measurement(enum ima_hooks func, struct ima_iint_cache *iint,
 	bool try_modsig = iint->flags & IMA_MODSIG_ALLOWED && modsig;
 
 	/* If not appraising a modsig, we need an xattr. */
-	if (!(inode->i_opflags & IOP_XATTR) && !try_modsig)
+	if (!(inode->i_opflags & IOP_XATTR) && !try_modsig &&
+	    !digest_cache_mask)
 		return INTEGRITY_UNKNOWN;
 
 	/* If reading the xattr failed and there's no modsig, error out. */
-	if (rc <= 0 && !try_modsig) {
+	if (rc <= 0 && !try_modsig && !digest_cache_mask) {
 		if (rc && rc != -ENODATA)
 			goto out;
 
@@ -524,8 +526,11 @@ int ima_appraise_measurement(enum ima_hooks func, struct ima_iint_cache *iint,
 	case INTEGRITY_UNKNOWN:
 		break;
 	case INTEGRITY_NOXATTRS:	/* No EVM protected xattrs. */
-		/* It's fine not to have xattrs when using a modsig. */
-		if (try_modsig)
+		/*
+		 * It's fine not to have xattrs when using a modsig or the
+		 * digest cache.
+		 */
+		if (try_modsig || digest_cache_mask)
 			break;
 		fallthrough;
 	case INTEGRITY_NOLABEL:		/* No security.evm xattr. */
@@ -554,6 +559,12 @@ int ima_appraise_measurement(enum ima_hooks func, struct ima_iint_cache *iint,
 	    (!xattr_value || xattr_value->type == IMA_XATTR_DIGEST_NG ||
 	     rc == -ENOKEY))
 		rc = modsig_verify(func, modsig, &status, &cause);
+
+	if (!xattr_value && !modsig &&
+	    (digest_cache_mask & IMA_DIGEST_CACHE_APPRAISE_CONTENT)) {
+		status = INTEGRITY_PASS;
+		rc = 0;
+	}
 
 out:
 	/*
