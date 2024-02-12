@@ -192,6 +192,7 @@ struct ima_iint_cache {
 	enum integrity_status ima_read_status:4;
 	enum integrity_status ima_creds_status:4;
 	struct ima_digest_data *ima_hash;
+	struct digest_cache *digest_cache;
 };
 
 extern struct lsm_blob_sizes ima_blob_sizes;

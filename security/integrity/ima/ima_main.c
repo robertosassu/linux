@@ -301,6 +301,15 @@ static int process_measurement(struct file *file, const struct cred *cred,
 		}
 	}
 
+	/* Check if digest cache changed since last measurement/appraisal. */
+	if (iint->digest_cache &&
+	    digest_cache_changed(inode, iint->digest_cache)) {
+		iint->flags &= ~IMA_DONE_MASK;
+		iint->measured_pcrs = 0;
+		digest_cache_put(iint->digest_cache);
+		iint->digest_cache = NULL;
+	}
+
 	/* Determine if already appraised/measured based on bitmask
 	 * (IMA_MEASURE, IMA_MEASURED, IMA_XXXX_APPRAISE, IMA_XXXX_APPRAISED,
 	 *  IMA_AUDIT, IMA_AUDITED)
@@ -366,8 +375,15 @@ static int process_measurement(struct file *file, const struct cred *cred,
 	if (!pathbuf)	/* ima_rdwr_violation possibly pre-fetched */
 		pathname = ima_d_path(&file->f_path, &pathbuf, filename);
 
-	if (rc == 0 && policy_mask)
-		digest_cache = digest_cache_get(file_dentry(file));
+	if (rc == 0 && policy_mask) {
+		if (!iint->digest_cache) {
+			/* Released by ima_iint_free(). */
+			digest_cache = digest_cache_get(file_dentry(file));
+			iint->digest_cache = digest_cache;
+		} else {
+			digest_cache = iint->digest_cache;
+		}
+	}
 
 	if (digest_cache) {
 		found = digest_cache_lookup(file_dentry(file), digest_cache,
@@ -381,8 +397,6 @@ static int process_measurement(struct file *file, const struct cred *cred,
 			if (verif_mask_ptr)
 				allow_mask = policy_mask & *verif_mask_ptr;
 		}
-
-		digest_cache_put(digest_cache);
 	}
 
 	if (action & IMA_MEASURE)

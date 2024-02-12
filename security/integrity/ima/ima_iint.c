@@ -75,6 +75,8 @@ static void ima_iint_init_always(struct ima_iint_cache *iint,
 static void ima_iint_free(struct ima_iint_cache *iint)
 {
 	kfree(iint->ima_hash);
+	if (iint->digest_cache)
+		digest_cache_put(iint->digest_cache);
 	mutex_destroy(&iint->mutex);
 	kmem_cache_free(ima_iint_cache, iint);
 }
