@@ -143,6 +143,12 @@ int digest_cache_populate(struct digest_cache *digest_cache,
 		return ret;
 	}
 
+	/* The caller wants just to read digest lists. */
+	if (!digest_cache) {
+		ret = 0;
+		goto out_vfree;
+	}
+
 	data_len = digest_cache_strip_modsig(data, ret);
 
 	/* Digest list parsers initialize the hash table and add the digests. */
@@ -151,7 +157,7 @@ int digest_cache_populate(struct digest_cache *digest_cache,
 	if (ret < 0)
 		pr_debug("Error parsing digest list %s%s%s, ret: %d\n",
 			 path_str, filename[0] ? "/" : "", filename, ret);
-
+out_vfree:
 	vfree(data);
 	return ret;
 }

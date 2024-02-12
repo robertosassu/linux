@@ -54,6 +54,7 @@ static bool digest_cache_dir_iter(struct dir_context *__ctx, const char *name,
 	new_entry->seq_num = UINT_MAX;
 	new_entry->digest_cache = NULL;
 	mutex_init(&new_entry->digest_cache_mutex);
+	new_entry->prefetched = false;
 
 	if (new_entry->name[0] < '0' || new_entry->name[0] > '9')
 		goto out;
@@ -127,6 +128,7 @@ int digest_cache_dir_create(struct digest_cache *digest_cache,
  * @digest_cache: Digest cache
  * @digest: Digest to search
  * @algo: Algorithm of the digest to search
+ * @filename: File name of the digest list to search
  *
  * This function iterates over the linked list created by
  * digest_cache_dir_create() and looks up the digest in the digest cache of
@@ -149,7 +151,8 @@ digest_cache_dir_lookup_digest(struct dentry *dentry,
 		if (!dir_entry->digest_cache) {
 			cache = digest_cache_create(dentry, digest_list_path,
 						    digest_cache->path_str,
-						    dir_entry->name);
+						    dir_entry->name, false,
+						    false);
 			/* Ignore digest caches that cannot be instantiated. */
 			if (!cache) {
 				mutex_unlock(&dir_entry->digest_cache_mutex);
@@ -158,6 +161,8 @@ digest_cache_dir_lookup_digest(struct dentry *dentry,
 
 			/* Consume extra ref. from digest_cache_create(). */
 			dir_entry->digest_cache = cache;
+			/* Digest list was read, mark entry as prefetched. */
+			dir_entry->prefetched = true;
 		}
 		mutex_unlock(&dir_entry->digest_cache_mutex);
 
@@ -169,6 +174,54 @@ digest_cache_dir_lookup_digest(struct dentry *dentry,
 	}
 
 	return 0UL;
+}
+
+/**
+ * digest_cache_dir_lookup_filename - Lookup a digest list
+ * @dentry: Dentry of the file whose digest list is looked up
+ * @digest_list_path: Path structure of the digest list directory
+ * @digest_cache: Digest cache
+ * @filename: File name of the digest list to search
+ *
+ * This function iterates over the linked list created by
+ * digest_cache_dir_create() and looks up a digest list with a matching file
+ * name among the entries. If there is no match, it prefetches (reads) the
+ * current digest list. Otherwise, it returns the digest cache pointer from
+ * digest_cache_create() to the caller.
+ *
+ * Return: A digest cache pointer if the digest list if found, NULL otherwise.
+ */
+struct digest_cache *
+digest_cache_dir_lookup_filename(struct dentry *dentry,
+				 struct path *digest_list_path,
+				 struct digest_cache *digest_cache,
+				 char *filename)
+{
+	struct digest_cache *cache;
+	struct dir_entry *dir_entry;
+	bool filename_found;
+
+	list_for_each_entry(dir_entry, &digest_cache->dir_entries, list) {
+		mutex_lock(&dir_entry->digest_cache_mutex);
+		filename_found = !strcmp(dir_entry->name, filename);
+		if (!filename_found && dir_entry->prefetched) {
+			mutex_unlock(&dir_entry->digest_cache_mutex);
+			continue;
+		}
+
+		cache = digest_cache_create(dentry, digest_list_path,
+					    digest_cache->path_str,
+					    dir_entry->name, false,
+					    filename_found ? false : true);
+
+		dir_entry->prefetched = true;
+		mutex_unlock(&dir_entry->digest_cache_mutex);
+
+		if (filename_found)
+			return cache;
+	}
+
+	return NULL;
 }
 
 /**

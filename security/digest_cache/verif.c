@@ -33,13 +33,16 @@ static void free_verif(struct digest_cache_verif *verif)
  * This function lets a verifier supply verification data about a digest list
  * being read to populate the digest cache.
  *
- * Return: Zero on success, -ENOMEM if out of memory.
+ * Return: Zero on success, -ENOMEM if out of memory, -ENOENT on prefetching.
  */
 int digest_cache_verif_set(struct file *file, const char *verif_id, void *data,
 			   size_t size)
 {
 	struct digest_cache *digest_cache = digest_cache_from_file_sec(file);
 	struct digest_cache_verif *new_verif;
+
+	if (!digest_cache)
+		return -ENOENT;
 
 	/*
 	 * All allocations must be atomic (non-sleepable) since kprobe does not
