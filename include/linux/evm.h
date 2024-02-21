@@ -57,6 +57,20 @@ static inline void evm_inode_post_set_acl(struct dentry *dentry,
 {
 	return evm_inode_post_setxattr(dentry, acl_name, NULL, 0);
 }
+extern int evm_inode_set_fscaps(struct mnt_idmap *idmap,
+				struct dentry *dentry,
+				const struct vfs_caps *caps, int flags);
+static inline int evm_inode_remove_fscaps(struct dentry *dentry)
+{
+	return evm_inode_set_fscaps(&nop_mnt_idmap, dentry, NULL, XATTR_REPLACE);
+}
+extern void evm_inode_post_set_fscaps(struct mnt_idmap *idmap,
+				      struct dentry *dentry,
+				      const struct vfs_caps *caps, int flags);
+static inline void evm_inode_post_remove_fscaps(struct dentry *dentry)
+{
+	return evm_inode_post_set_fscaps(&nop_mnt_idmap, dentry, NULL, 0);
+}
 
 int evm_inode_init_security(struct inode *inode, struct inode *dir,
 			    const struct qstr *qstr, struct xattr *xattrs,
@@ -160,6 +174,31 @@ static inline int evm_inode_remove_acl(struct mnt_idmap *idmap,
 static inline void evm_inode_post_set_acl(struct dentry *dentry,
 					  const char *acl_name,
 					  struct posix_acl *kacl)
+{
+	return;
+}
+
+static inline int evm_inode_set_fscaps(struct mnt_idmap *idmap,
+				       struct dentry *dentry,
+				       const struct vfs_caps *caps, int flags)
+{
+	return 0;
+}
+
+static inline int evm_inode_remove_fscaps(struct dentry *dentry)
+{
+	return 0;
+}
+
+static inline void evm_inode_post_set_fscaps(struct mnt_idmap *idmap,
+					     struct dentry *dentry,
+					     const struct vfs_caps *caps,
+					     int flags)
+{
+	return;
+}
+
+static inline void evm_inode_post_remove_fscaps(struct dentry *dentry)
 {
 	return;
 }

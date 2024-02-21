@@ -805,6 +805,66 @@ void evm_inode_post_removexattr(struct dentry *dentry, const char *xattr_name)
 	evm_update_evmxattr(dentry, xattr_name, NULL, 0);
 }
 
+int evm_inode_set_fscaps(struct mnt_idmap *idmap, struct dentry *dentry,
+			 const struct vfs_caps *caps, int flags)
+{
+	struct inode *inode = d_inode(dentry);
+	struct vfs_ns_cap_data nscaps;
+	const void *xattr_data = NULL;
+	int size = 0;
+
+	/* Policy permits modification of the protected xattrs even though
+	 * there's no HMAC key loaded
+	 */
+	if (evm_initialized & EVM_ALLOW_METADATA_WRITES)
+		return 0;
+
+	if (caps) {
+		size = vfs_caps_to_xattr(idmap, i_user_ns(inode), caps, &nscaps,
+					 sizeof(nscaps));
+		if (size < 0)
+			return size;
+		xattr_data = &nscaps;
+	}
+
+	return evm_protect_xattr(idmap, dentry, XATTR_NAME_CAPS, xattr_data, size);
+}
+
+void evm_inode_post_set_fscaps(struct mnt_idmap *idmap, struct dentry *dentry,
+			       const struct vfs_caps *caps, int flags)
+{
+	struct inode *inode = d_inode(dentry);
+	struct vfs_ns_cap_data nscaps;
+	const void *xattr_data = NULL;
+	int size = 0;
+
+	if (!evm_revalidate_status(XATTR_NAME_CAPS))
+		return;
+
+	evm_reset_status(dentry->d_inode);
+
+	if (!(evm_initialized & EVM_INIT_HMAC))
+		return;
+
+	if (is_unsupported_fs(dentry))
+		return;
+
+	if (caps) {
+		size = vfs_caps_to_xattr(idmap, i_user_ns(inode), caps, &nscaps,
+					 sizeof(nscaps));
+		/*
+		 * The fscaps here should have been converted to an xattr by
+		 * evm_inode_set_fscaps() already, so a failure to convert
+		 * here is a bug.
+		 */
+		if (WARN_ON_ONCE(size < 0))
+			return;
+		xattr_data = &nscaps;
+	}
+
+	evm_update_evmxattr(dentry, XATTR_NAME_CAPS, xattr_data, size);
+}
+
 static int evm_attr_change(struct mnt_idmap *idmap,
 			   struct dentry *dentry, struct iattr *attr)
 {
