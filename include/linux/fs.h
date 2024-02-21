@@ -2116,6 +2116,10 @@ extern int vfs_dedupe_file_range(struct file *file,
 extern loff_t vfs_dedupe_file_range_one(struct file *src_file, loff_t src_pos,
 					struct file *dst_file, loff_t dst_pos,
 					loff_t len, unsigned int remap_flags);
+extern int vfs_get_fscaps_nosec(struct mnt_idmap *idmap, struct dentry *dentry,
+				struct vfs_caps *caps);
+extern int vfs_get_fscaps(struct mnt_idmap *idmap, struct dentry *dentry,
+			  struct vfs_caps *caps);
 
 /**
  * enum freeze_holder - holder of the freeze
