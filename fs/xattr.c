@@ -534,6 +534,9 @@ vfs_setxattr(struct mnt_idmap *idmap, struct dentry *dentry,
 	const void  *orig_value = value;
 	int error;
 
+	if (WARN_ON_ONCE(is_fscaps_xattr(name)))
+		return -EOPNOTSUPP;
+
 retry_deleg:
 	inode_lock(inode);
 	error = __vfs_setxattr_locked(idmap, dentry, name, value, size,
@@ -648,6 +651,9 @@ vfs_getxattr(struct mnt_idmap *idmap, struct dentry *dentry,
 {
 	struct inode *inode = dentry->d_inode;
 	int error;
+
+	if (WARN_ON_ONCE(is_fscaps_xattr(name)))
+		return -EOPNOTSUPP;
 
 	error = xattr_permission(idmap, inode, name, MAY_READ);
 	if (error)
@@ -787,6 +793,9 @@ vfs_removexattr(struct mnt_idmap *idmap, struct dentry *dentry,
 	struct inode *inode = dentry->d_inode;
 	struct inode *delegated_inode = NULL;
 	int error;
+
+	if (WARN_ON_ONCE(is_fscaps_xattr(name)))
+		return -EOPNOTSUPP;
 
 retry_deleg:
 	inode_lock(inode);
