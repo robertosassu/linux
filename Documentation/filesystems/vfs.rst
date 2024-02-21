@@ -514,6 +514,8 @@ As of kernel 2.6.22, the following members are defined:
 		int (*tmpfile) (struct mnt_idmap *, struct inode *, struct file *, umode_t);
 		struct posix_acl * (*get_acl)(struct mnt_idmap *, struct dentry *, int);
 	        int (*set_acl)(struct mnt_idmap *, struct dentry *, struct posix_acl *, int);
+		int (*get_fscaps)(struct mnt_idmap *, struct dentry *, struct vfs_caps *);
+		int (*set_fscaps)(struct mnt_idmap *, struct dentry *, const struct vfs_caps *, int setxattr_flags);
 		int (*fileattr_set)(struct mnt_idmap *idmap,
 				    struct dentry *dentry, struct fileattr *fa);
 		int (*fileattr_get)(struct dentry *dentry, struct fileattr *fa);
@@ -666,6 +668,21 @@ otherwise noted.
 	directory.  On success needs to return with the file already
 	open; this can be done by calling finish_open_simple() right at
 	the end.
+
+``get_fscaps``
+
+        called to get filesystem capabilites of an inode.  If unset,
+        xattr handlers will be used to get the raw xattr data.  Most
+        filesystems can rely on the generic handler.
+
+``set_fscaps``
+
+        called to set filesystem capabilites of an inode.  If unset,
+        xattr handlers will be used to set the raw xattr data.  Most
+        filesystems can rely on the generic handler.
+
+        If the new fscaps value is NULL the filesystem must remove any
+        fscaps from the inode.
 
 ``fileattr_get``
 	called on ioctl(FS_IOC_GETFLAGS) and ioctl(FS_IOC_FSGETXATTR) to

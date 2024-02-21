@@ -81,6 +81,8 @@ prototypes::
 				umode_t create_mode);
 	int (*tmpfile) (struct mnt_idmap *, struct inode *,
 			struct file *, umode_t);
+	int (*get_fscaps)(struct mnt_idmap *, struct dentry *, struct vfs_caps *);
+	int (*set_fscaps)(struct mnt_idmap *, struct dentry *, const struct vfs_caps *, int setxattr_flags);
 	int (*fileattr_set)(struct mnt_idmap *idmap,
 			    struct dentry *dentry, struct fileattr *fa);
 	int (*fileattr_get)(struct dentry *dentry, struct fileattr *fa);
@@ -114,6 +116,8 @@ fiemap:		no
 update_time:	no
 atomic_open:	shared (exclusive if O_CREAT is set in open flags)
 tmpfile:	no
+get_fscaps:     no
+set_fscaps:     exclusive
 fileattr_get:	no or exclusive
 fileattr_set:	exclusive
 get_offset_ctx  no
