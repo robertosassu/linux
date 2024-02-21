@@ -792,6 +792,84 @@ ssize_t vfs_caps_to_xattr(struct mnt_idmap *idmap,
 }
 
 /**
+ * vfs_caps_to_user_xattr - convert vfs_caps to caps xattr for userspace
+ *
+ * @idmap:       idmap of the mount the inode was found from
+ * @dest_userns: user namespace for ids in xattr data
+ * @vfs_caps:    source vfs_caps data
+ * @data:        destination buffer for rax xattr caps data
+ * @size:        size of the @data buffer
+ *
+ * Converts a kernel-internal capability into the raw security.capability
+ * xattr format. Implements the following policies required for fscaps
+ * returned to userspace:
+ *
+ *  - Returns -EINVAL if the on-disk capability is in v1 format.
+ *  - Masks off all bits in magic_etc except for the version and
+ *    VFS_CAP_FLAGS_EFFECTIVE.
+ *  - Converts v3 capabilities to v2 format if the rootid returned to
+ *    userspace would be 0 or if the rootid corresponds to root in an
+ *    ancestor user namespace.
+ *  - Returns EOVERFLOW for a v3 capability whose rootid does not map to a
+ *    valid id in current_user_ns() or to root in an ancestor namespace.
+ *
+ * If the xattr is being read or written through an idmapped mount the
+ * idmap of the vfsmount must be passed through @idmap. This function
+ * will then take care to map the rootid according to @idmap.
+ *
+ * Return: On success, return the size of the xattr data. On error,
+ * return < 0.
+ */
+ssize_t vfs_caps_to_user_xattr(struct mnt_idmap *idmap,
+			       struct user_namespace *dest_userns,
+			       const struct vfs_caps *vfs_caps,
+			       void *data, size_t size)
+{
+	struct vfs_ns_cap_data *ns_caps = data;
+	bool is_v3;
+	u32 magic;
+
+	/* Preserve previous behavior of returning EINVAL for v1 caps */
+	if ((vfs_caps->magic_etc & VFS_CAP_REVISION_MASK) == VFS_CAP_REVISION_1)
+		return -EINVAL;
+
+	size = __vfs_caps_to_xattr(idmap, dest_userns, vfs_caps, data, size);
+	if (size < 0)
+		return size;
+
+	magic = vfs_caps->magic_etc &
+		(VFS_CAP_REVISION_MASK | VFS_CAP_FLAGS_EFFECTIVE);
+	ns_caps->magic_etc = cpu_to_le32(magic);
+
+	/*
+	 * If this is a v3 capability with a valid, non-zero rootid, return
+	 * the v3 capability to userspace. A v3 capability with a rootid of
+	 * 0 will be converted to a v2 capability below for compatibility
+	 * with old userspace.
+	 */
+	is_v3 = (vfs_caps->magic_etc & VFS_CAP_REVISION_MASK) == VFS_CAP_REVISION_3;
+	if (is_v3) {
+		uid_t rootid = le32_to_cpu(ns_caps->rootid);
+		if (rootid != (uid_t)-1 && rootid != (uid_t)0)
+			return size;
+	}
+
+	if (!rootid_owns_currentns(vfs_caps->rootid))
+		return -EOVERFLOW;
+
+	/* This comes from a parent namespace. Return as a v2 capability. */
+	if (is_v3) {
+		magic = VFS_CAP_REVISION_2 |
+			(vfs_caps->magic_etc & VFS_CAP_FLAGS_EFFECTIVE);
+		ns_caps->magic_etc = cpu_to_le32(magic);
+		ns_caps->rootid = cpu_to_le32(0);
+		size = XATTR_CAPS_SZ_2;
+	}
+
+	return size;
+}
+
+/**
  * get_vfs_caps_from_disk - retrieve vfs caps from disk
  *
  * @idmap:	idmap of the mount the inode was found from
