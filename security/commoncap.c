@@ -296,11 +296,12 @@ int cap_capset(struct cred *new,
  */
 int cap_inode_need_killpriv(struct dentry *dentry)
 {
-	struct inode *inode = d_backing_inode(dentry);
+	struct vfs_caps caps;
 	int error;
 
-	error = __vfs_getxattr(dentry, inode, XATTR_NAME_CAPS, NULL, 0);
-	return error > 0;
+	/* Use nop_mnt_idmap for no mapping here as mapping is unimportant */
+	error = vfs_get_fscaps_nosec(&nop_mnt_idmap, dentry, &caps);
+	return error == 0;
 }
 
 /**
@@ -323,7 +324,7 @@ int cap_inode_killpriv(struct mnt_idmap *idmap, struct dentry *dentry)
 {
 	int error;
 
-	error = __vfs_removexattr(idmap, dentry, XATTR_NAME_CAPS);
+	error = vfs_remove_fscaps_nosec(idmap, dentry);
 	if (error == -EOPNOTSUPP)
 		error = 0;
 	return error;
@@ -719,6 +720,10 @@ ssize_t vfs_caps_to_user_xattr(struct mnt_idmap *idmap,
  * @cpu_caps:	vfs capabilities
  *
  * Extract the on-exec-apply capability sets for an executable file.
+ * For version 3 capabilities xattrs, returns the capabilities only if
+ * they are applicable to current_user_ns() (i.e. that the rootid
+ * corresponds to an ID which maps to ID 0 in current_user_ns() or an
+ * ancestor), and returns -ENODATA otherwise.
  *
  * If the inode has been found through an idmapped mount the idmap of
  * the vfsmount must be passed through @idmap. This function will then
@@ -731,25 +736,16 @@ int get_vfs_caps_from_disk(struct mnt_idmap *idmap,
 			   struct vfs_caps *cpu_caps)
 {
 	struct inode *inode = d_backing_inode(dentry);
-	int size, ret;
-	struct vfs_ns_cap_data data, *nscaps = &data;
+	int ret;
 
 	if (!inode)
 		return -ENODATA;
 
-	size = __vfs_getxattr((struct dentry *)dentry, inode,
-			      XATTR_NAME_CAPS, &data, XATTR_CAPS_SZ);
-	if (size == -ENODATA || size == -EOPNOTSUPP)
+	ret = vfs_get_fscaps_nosec(idmap, (struct dentry *)dentry, cpu_caps);
+	if (ret == -EOPNOTSUPP || ret == -EOVERFLOW)
 		/* no data, that's ok */
-		return -ENODATA;
+		ret = -ENODATA;
 
-	if (size < 0)
-		return size;
-
-	ret = vfs_caps_from_xattr(idmap, inode->i_sb->s_user_ns,
-				  cpu_caps, nscaps, size);
-	if (ret == -EOVERFLOW)
-		return -ENODATA;
 	if (ret)
 		return ret;
 
