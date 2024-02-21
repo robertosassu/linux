@@ -16,6 +16,10 @@
 
 #include <linux/types.h>
 
+#ifdef __KERNEL__
+#include <linux/build_bug.h>
+#endif
+
 /* User-level do most of the mapping between kernel and user
    capabilities based on the version tag given by the kernel. The
    kernel might be somewhat backwards compatible, but don't bet on
@@ -99,6 +103,15 @@ struct vfs_ns_cap_data {
  */
 #define _LINUX_CAPABILITY_VERSION  _LINUX_CAPABILITY_VERSION_1
 #define _LINUX_CAPABILITY_U32S     _LINUX_CAPABILITY_U32S_1
+
+#else
+
+static_assert(offsetof(struct vfs_cap_data, magic_etc) ==
+	      offsetof(struct vfs_ns_cap_data, magic_etc));
+static_assert(offsetof(struct vfs_cap_data, data) ==
+	      offsetof(struct vfs_ns_cap_data, data));
+static_assert(sizeof(struct vfs_cap_data) ==
+	      offsetof(struct vfs_ns_cap_data, rootid));
 
 #endif
 
