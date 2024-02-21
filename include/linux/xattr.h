@@ -28,6 +28,11 @@ static inline bool is_posix_acl_xattr(const char *name)
 	       (strcmp(name, XATTR_NAME_POSIX_ACL_DEFAULT) == 0);
 }
 
+static inline bool is_fscaps_xattr(const char *name)
+{
+	return strcmp(name, XATTR_NAME_CAPS) == 0;
+}
+
 /*
  * struct xattr_handler: When @name is set, match attributes with exactly that
  * name.  When @prefix is set instead, match attributes with that prefix and
