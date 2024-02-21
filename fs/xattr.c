@@ -245,6 +245,85 @@ int vfs_get_fscaps(struct mnt_idmap *idmap, struct dentry *dentry,
 }
 EXPORT_SYMBOL(vfs_get_fscaps);
 
+static int generic_set_fscaps(struct mnt_idmap *idmap, struct dentry *dentry,
+			      const struct vfs_caps *caps, int setxattr_flags)
+{
+	struct inode *inode = d_inode(dentry);
+	struct vfs_ns_cap_data nscaps;
+	int size;
+
+	size = vfs_caps_to_xattr(idmap, i_user_ns(inode), caps,
+				 &nscaps, sizeof(nscaps));
+	if (size < 0)
+		return size;
+
+	return __vfs_setxattr_noperm(idmap, dentry, XATTR_NAME_CAPS,
+				     &nscaps, size, setxattr_flags);
+}
+
+/**
+ * vfs_set_fscaps - set filesystem capabilities
+ * @idmap: idmap of the mount the inode was found from
+ * @dentry: the dentry on which to set filesystem capabilities
+ * @caps: the filesystem capabilities to be written
+ * @setxattr_flags: setxattr flags to use when writing the capabilities xattr
+ *
+ * This function writes the supplied filesystem capabilities to the dentry.
+ *
+ * Return: 0 on success, a negative errno on error.
+ */
+int vfs_set_fscaps(struct mnt_idmap *idmap, struct dentry *dentry,
+		   const struct vfs_caps *caps, int setxattr_flags)
+{
+	struct inode *inode = d_inode(dentry);
+	struct inode *delegated_inode = NULL;
+	int error;
+
+retry_deleg:
+	inode_lock(inode);
+
+	error = xattr_permission(idmap, inode, XATTR_NAME_CAPS, MAY_WRITE);
+	if (error)
+		goto out_inode_unlock;
+	error = security_inode_set_fscaps(idmap, dentry, caps, setxattr_flags);
+	if (error)
+		goto out_inode_unlock;
+
+	error = try_break_deleg(inode, &delegated_inode);
+	if (error)
+		goto out_inode_unlock;
+
+	if (inode->i_opflags & IOP_XATTR) {
+		if (inode->i_op->set_fscaps)
+			error = inode->i_op->set_fscaps(idmap, dentry, caps,
+							setxattr_flags);
+		else
+			error = generic_set_fscaps(idmap, dentry, caps,
+						   setxattr_flags);
+		if (!error) {
+			fsnotify_xattr(dentry);
+			security_inode_post_set_fscaps(idmap, dentry, caps,
+						       setxattr_flags);
+		}
+	} else if (unlikely(is_bad_inode(inode))) {
+		error = -EIO;
+	} else {
+		error = -EOPNOTSUPP;
+	}
+
+out_inode_unlock:
+	inode_unlock(inode);
+
+	if (delegated_inode) {
+		error = break_deleg_wait(&delegated_inode);
+		if (!error)
+			goto retry_deleg;
+	}
+
+	return error;
+}
+EXPORT_SYMBOL(vfs_set_fscaps);
+
 int
 __vfs_setxattr(struct mnt_idmap *idmap, struct dentry *dentry,
 	       struct inode *inode, const char *name, const void *value,
