@@ -3367,6 +3367,29 @@ static int selinux_inode_removexattr(struct mnt_idmap *idmap,
 	return -EACCES;
 }
 
+static int selinux_inode_set_fscaps(struct mnt_idmap *idmap,
+				    struct dentry *dentry,
+				    const struct vfs_caps *caps, int flags)
+{
+	return dentry_has_perm(current_cred(), dentry, FILE__SETATTR);
+}
+
+static int selinux_inode_get_fscaps(struct mnt_idmap *idmap,
+				    struct dentry *dentry)
+{
+	return dentry_has_perm(current_cred(), dentry, FILE__GETATTR);
+}
+
+static int selinux_inode_remove_fscaps(struct mnt_idmap *idmap,
+				       struct dentry *dentry)
+{
+	int rc = cap_inode_removexattr(idmap, dentry, XATTR_NAME_CAPS);
+	if (rc)
+		return rc;
+
+	return dentry_has_perm(current_cred(), dentry, FILE__SETATTR);
+}
+
 static int selinux_path_notify(const struct path *path, u64 mask,
 						unsigned int obj_type)
 {
@@ -7165,6 +7188,9 @@ static struct security_hook_list selinux_hooks[] __ro_after_init = {
 	LSM_HOOK_INIT(inode_set_acl, selinux_inode_set_acl),
 	LSM_HOOK_INIT(inode_get_acl, selinux_inode_get_acl),
 	LSM_HOOK_INIT(inode_remove_acl, selinux_inode_remove_acl),
+	LSM_HOOK_INIT(inode_set_fscaps, selinux_inode_set_fscaps),
+	LSM_HOOK_INIT(inode_get_fscaps, selinux_inode_get_fscaps),
+	LSM_HOOK_INIT(inode_remove_fscaps, selinux_inode_remove_fscaps),
 	LSM_HOOK_INIT(inode_getsecurity, selinux_inode_getsecurity),
 	LSM_HOOK_INIT(inode_setsecurity, selinux_inode_setsecurity),
 	LSM_HOOK_INIT(inode_listsecurity, selinux_inode_listsecurity),
