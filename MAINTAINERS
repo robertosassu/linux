@@ -8210,6 +8210,7 @@ S:	Maintained
 F:	Documentation/filesystems/idmappings.rst
 F:	fs/mnt_idmapping.c
 F:	include/linux/mnt_idmapping.*
+F:	include/linux/vfsid.h
 F:	tools/testing/selftests/mount_setattr/
 
 FILESYSTEMS [IOMAP]
