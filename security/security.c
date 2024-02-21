@@ -2352,6 +2352,75 @@ int security_inode_remove_acl(struct mnt_idmap *idmap,
 }
 
 /**
+ * security_inode_set_fscaps() - Check if setting fscaps is allowed
+ * @idmap: idmap of the mount
+ * @dentry: file
+ * @caps: fscaps to be written
+ * @flags: flags for setxattr
+ *
+ * Check permission before setting the file capabilities given in @vfs_caps.
+ *
+ * Return: Returns 0 if permission is granted.
+ */
+int security_inode_set_fscaps(struct mnt_idmap *idmap, struct dentry *dentry,
+			      const struct vfs_caps *caps, int flags)
+{
+	if (unlikely(IS_PRIVATE(d_backing_inode(dentry))))
+		return 0;
+	return call_int_hook(inode_set_fscaps, 0, idmap, dentry, caps, flags);
+}
+
+/**
+ * security_inode_post_set_fscaps() - Update the inode after setting fscaps
+ * @idmap: idmap of the mount
+ * @dentry: file
+ * @caps: fscaps to be written
+ * @flags: flags for setxattr
+ *
+ * Update inode security field after successfully setting fscaps.
+ *
+ */
+void security_inode_post_set_fscaps(struct mnt_idmap *idmap,
+				    struct dentry *dentry,
+				    const struct vfs_caps *caps, int flags)
+{
+	if (unlikely(IS_PRIVATE(d_backing_inode(dentry))))
+		return;
+	call_void_hook(inode_post_set_fscaps, idmap, dentry, caps, flags);
+}
+
+/**
+ * security_inode_get_fscaps() - Check if reading fscaps is allowed
+ * @dentry: file
+ *
+ * Check permission before getting fscaps.
+ *
+ * Return: Returns 0 if permission is granted.
+ */
+int security_inode_get_fscaps(struct mnt_idmap *idmap, struct dentry *dentry)
+{
+	if (unlikely(IS_PRIVATE(d_backing_inode(dentry))))
+		return 0;
+	return call_int_hook(inode_get_fscaps, 0, idmap, dentry);
+}
+
+/**
+ * security_inode_remove_fscaps() - Check if removing fscaps is allowed
+ * @idmap: idmap of the mount
+ * @dentry: file
+ *
+ * Check permission before removing fscaps.
+ *
+ * Return: Returns 0 if permission is granted.
+ */
+int security_inode_remove_fscaps(struct mnt_idmap *idmap, struct dentry *dentry)
+{
+	if (unlikely(IS_PRIVATE(d_backing_inode(dentry))))
+		return 0;
+	return call_int_hook(inode_remove_fscaps, 0, idmap, dentry);
+}
+
+/**
  * security_inode_post_setxattr() - Update the inode after a setxattr operation
  * @dentry: file
  * @name: xattr name

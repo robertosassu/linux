@@ -152,6 +152,13 @@ LSM_HOOK(int, 0, inode_get_acl, struct mnt_idmap *idmap,
 	 struct dentry *dentry, const char *acl_name)
 LSM_HOOK(int, 0, inode_remove_acl, struct mnt_idmap *idmap,
 	 struct dentry *dentry, const char *acl_name)
+LSM_HOOK(int, 0, inode_set_fscaps, struct mnt_idmap *idmap,
+	 struct dentry *dentry, const struct vfs_caps *caps, int flags);
+LSM_HOOK(void, LSM_RET_VOID, inode_post_set_fscaps, struct mnt_idmap *idmap,
+	 struct dentry *dentry, const struct vfs_caps *caps, int flags);
+LSM_HOOK(int, 0, inode_get_fscaps, struct mnt_idmap *idmap, struct dentry *dentry);
+LSM_HOOK(int, 0, inode_remove_fscaps, struct mnt_idmap *idmap,
+	 struct dentry *dentry);
 LSM_HOOK(int, 0, inode_need_killpriv, struct dentry *dentry)
 LSM_HOOK(int, 0, inode_killpriv, struct mnt_idmap *idmap,
 	 struct dentry *dentry)
