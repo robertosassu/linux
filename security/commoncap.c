@@ -1205,7 +1205,7 @@ int cap_inode_setxattr(struct dentry *dentry, const char *name,
 	 * For XATTR_NAME_CAPS the check will be done in
 	 * cap_convert_nscap(), called by setxattr()
 	 */
-	if (strcmp(name, XATTR_NAME_CAPS) == 0)
+	if (is_fscaps_xattr(name))
 		return 0;
 
 	if (!ns_capable(user_ns, CAP_SYS_ADMIN))
@@ -1242,7 +1242,7 @@ int cap_inode_removexattr(struct mnt_idmap *idmap,
 			XATTR_SECURITY_PREFIX_LEN) != 0)
 		return 0;
 
-	if (strcmp(name, XATTR_NAME_CAPS) == 0) {
+	if (is_fscaps_xattr(name)) {
 		/* security.capability gets namespaced */
 		struct inode *inode = d_backing_inode(dentry);
 		if (!inode)
