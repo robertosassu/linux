@@ -141,7 +141,7 @@ struct winch_data {
 	int pipe_fd;
 };
 
-static __noreturn int winch_thread(void *arg)
+static int winch_thread(void *arg)
 {
 	struct winch_data *data = arg;
 	sigset_t sigs;
@@ -168,7 +168,7 @@ static __noreturn int winch_thread(void *arg)
 	if (sigprocmask(SIG_SETMASK, &sigs, NULL) < 0) {
 		os_info("winch_thread : sigprocmask failed, errno = %d\n",
 			errno);
-		goto wait_kill;
+		exit(1);
 	}
 	/* In sigsuspend(), block anything else than SIGWINCH. */
 	sigdelset(&sigs, SIGWINCH);
@@ -176,19 +176,19 @@ static __noreturn int winch_thread(void *arg)
 	if (setsid() < 0) {
 		os_info("winch_thread : setsid failed, errno = %d\n",
 		       errno);
-		goto wait_kill;
+		exit(1);
 	}
 
 	if (ioctl(pty_fd, TIOCSCTTY, 0) < 0) {
 		os_info("winch_thread : TIOCSCTTY failed on "
 			"fd %d err = %d\n", pty_fd, errno);
-		goto wait_kill;
+		exit(1);
 	}
 
 	if (tcsetpgrp(pty_fd, os_getpid()) < 0) {
 		os_info("winch_thread : tcsetpgrp failed on fd %d err = %d\n",
 			pty_fd, errno);
-		goto wait_kill;
+		exit(1);
 	}
 
 	/*
@@ -214,12 +214,6 @@ static __noreturn int winch_thread(void *arg)
 			os_info("winch_thread : write failed, err = %d\n",
 				errno);
 	}
-
-wait_kill:
-	c = 2;
-	count = write(pipe_fd, &c, sizeof(c));
-	while (1)
-		pause();
 }
 
 static int winch_tramp(int fd, struct tty_port *port, int *fd_out,
