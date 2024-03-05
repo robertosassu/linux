@@ -2372,6 +2372,9 @@ int security_inode_set_fscaps(struct mnt_idmap *idmap, struct dentry *dentry,
 	ret = call_int_hook(inode_set_fscaps, 0, idmap, dentry, caps, flags);
 	if (ret)
 		return ret;
+	ret = ima_inode_set_fscaps(idmap, dentry, caps, flags);
+	if (ret)
+		return ret;
 	return evm_inode_set_fscaps(idmap, dentry, caps, flags);
 }
 
@@ -2426,6 +2429,9 @@ int security_inode_remove_fscaps(struct mnt_idmap *idmap, struct dentry *dentry)
 	if (unlikely(IS_PRIVATE(d_backing_inode(dentry))))
 		return 0;
 	ret = call_int_hook(inode_remove_fscaps, 0, idmap, dentry);
+	if (ret)
+		return ret;
+	ret = ima_inode_remove_fscaps(dentry);
 	if (ret)
 		return ret;
 	return evm_inode_remove_fscaps(dentry);

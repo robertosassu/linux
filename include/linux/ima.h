@@ -11,6 +11,7 @@
 #include <linux/fs.h>
 #include <linux/security.h>
 #include <linux/kexec.h>
+#include <linux/xattr.h>
 #include <crypto/hash_info.h>
 struct linux_binprm;
 
@@ -199,6 +200,13 @@ static inline int ima_inode_remove_acl(struct mnt_idmap *idmap,
 	return ima_inode_set_acl(idmap, dentry, acl_name, NULL);
 }
 extern int ima_inode_removexattr(struct dentry *dentry, const char *xattr_name);
+extern int ima_inode_set_fscaps(struct mnt_idmap *idmap, struct dentry *dentry,
+				const struct vfs_caps *caps, int flags);
+static inline int ima_inode_remove_fscaps(struct dentry *dentry)
+{
+	return ima_inode_set_fscaps(&nop_mnt_idmap, dentry, NULL,
+				    XATTR_REPLACE);
+}
 #else
 static inline bool is_ima_appraise_enabled(void)
 {

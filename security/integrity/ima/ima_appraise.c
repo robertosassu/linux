@@ -800,3 +800,12 @@ int ima_inode_removexattr(struct dentry *dentry, const char *xattr_name)
 	}
 	return result;
 }
+
+int ima_inode_set_fscaps(struct mnt_idmap *idmap, struct dentry *dentry,
+			 const struct vfs_caps *caps, int flags)
+{
+	if (evm_revalidate_status(XATTR_NAME_CAPS))
+		ima_reset_appraise_flags(d_backing_inode(dentry), false);
+
+	return 0;
+}

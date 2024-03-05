@@ -982,7 +982,7 @@ do_getxattr(struct mnt_idmap *idmap, struct dentry *d,
 		 * so that it won't be mapped.
 		 */
 		ret = vfs_caps_to_user_xattr(&nop_mnt_idmap, current_user_ns(),
-					     &caps, &data, ctx->size);
+					     &caps, &data, sizeof(data));
 		if (ret < 0)
 			return ret;
 		if (ctx->size && copy_to_user(ctx->value, &data, ret))
