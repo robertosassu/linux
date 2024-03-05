@@ -278,8 +278,8 @@ static int evm_calc_hmac_or_hash(struct dentry *dentry,
 		if (size < 0)
 			continue;
 
-		user_space_size = vfs_getxattr(&nop_mnt_idmap, dentry,
-					       xattr->name, NULL, 0);
+		user_space_size = __vfs_getxattr(dentry, inode, xattr->name,
+						 NULL, 0);
 		if (user_space_size != size)
 			pr_debug("file %s: xattr %s size mismatch (kernel: %d, user: %d)\n",
 				 dentry->d_name.name, xattr->name, size,
