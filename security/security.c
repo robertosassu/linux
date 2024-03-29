@@ -1801,7 +1801,9 @@ EXPORT_SYMBOL(security_path_mknod);
  */
 void security_path_post_mknod(struct mnt_idmap *idmap, struct dentry *dentry)
 {
-	if (unlikely(IS_PRIVATE(d_backing_inode(dentry))))
+	/* Not all dentries have an inode attached after mknod. */
+	if (d_backing_inode(dentry) &&
+	    unlikely(IS_PRIVATE(d_backing_inode(dentry))))
 		return;
 	call_void_hook(path_post_mknod, idmap, dentry);
 }
