@@ -1034,7 +1034,7 @@ static void evm_file_release(struct file *file)
 		iint->flags &= ~EVM_NEW_FILE;
 }
 
-static void evm_post_path_mknod(struct mnt_idmap *idmap, struct dentry *dentry)
+static void evm_path_post_mknod(struct mnt_idmap *idmap, struct dentry *dentry)
 {
 	struct inode *inode = d_backing_inode(dentry);
 	struct evm_iint_cache *iint;
@@ -1102,7 +1102,7 @@ static struct security_hook_list evm_hooks[] __ro_after_init = {
 	LSM_HOOK_INIT(inode_init_security, evm_inode_init_security),
 	LSM_HOOK_INIT(inode_alloc_security, evm_inode_alloc_security),
 	LSM_HOOK_INIT(file_release, evm_file_release),
-	LSM_HOOK_INIT(path_post_mknod, evm_post_path_mknod),
+	LSM_HOOK_INIT(path_post_mknod, evm_path_post_mknod),
 };
 
 static const struct lsm_id evm_lsmid = {
