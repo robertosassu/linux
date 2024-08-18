@@ -32,6 +32,10 @@ static struct key *platform_trusted_keys;
 extern __initconst const u8 system_certificate_list[];
 extern __initconst const unsigned long system_certificate_list_size;
 extern __initconst const unsigned long module_cert_size;
+#ifdef CONFIG_PGP_PRELOAD_PUBLIC_KEYS
+extern __initconst const u8 pgp_public_keys[];
+extern __initconst const unsigned long pgp_public_keys_size;
+#endif
 
 /**
  * restrict_link_by_builtin_trusted - Restrict keyring addition by built-in CA
@@ -268,6 +272,15 @@ __init int load_module_cert(struct key *keyring)
 	if (!IS_ENABLED(CONFIG_IMA_APPRAISE_MODSIG))
 		return 0;
 
+#ifdef CONFIG_PGP_PRELOAD_PUBLIC_KEYS
+	pr_notice("Load PGP public keys to keyring %s\n", keyring->description);
+
+	if (preload_pgp_keys(pgp_public_keys,
+			     pgp_public_keys_size,
+			     keyring) < 0)
+		pr_err("Can't load PGP public keys\n");
+#endif
+
 	pr_notice("Loading compiled-in module X.509 certificates\n");
 
 	return x509_load_certificate_list(system_certificate_list,
@@ -290,6 +303,16 @@ static __init int load_system_certificate_list(void)
 #else
 	p = system_certificate_list + module_cert_size;
 	size = system_certificate_list_size - module_cert_size;
+#endif
+
+#ifdef CONFIG_PGP_PRELOAD_PUBLIC_KEYS
+	pr_notice("Load PGP public keys to keyring %s\n",
+		  builtin_trusted_keys->description);
+
+	if (preload_pgp_keys(pgp_public_keys,
+			     pgp_public_keys_size,
+			     builtin_trusted_keys) < 0)
+		pr_err("Can't load PGP public keys\n");
 #endif
 
 	return x509_load_certificate_list(p, size, builtin_trusted_keys);
