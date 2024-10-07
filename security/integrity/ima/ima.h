@@ -182,7 +182,6 @@ struct ima_kexec_hdr {
 
 /* IMA integrity metadata associated with an inode */
 struct ima_iint_cache {
-	struct mutex mutex;	/* protects: version, flags, digest */
 	struct integrity_inode_attributes real_inode;
 	unsigned long flags;
 	unsigned long measured_pcrs;
@@ -195,35 +194,43 @@ struct ima_iint_cache {
 	struct ima_digest_data *ima_hash;
 };
 
+struct ima_iint_cache_lock {
+	struct mutex mutex;	/* protects: version, flags, digest */
+	struct ima_iint_cache *iint;
+};
+
 extern struct lsm_blob_sizes ima_blob_sizes;
 
 static inline struct ima_iint_cache *
 ima_inode_get_iint(const struct inode *inode)
 {
-	struct ima_iint_cache **iint_sec;
+	struct ima_iint_cache_lock *iint_lock;
 
 	if (unlikely(!inode->i_security))
 		return NULL;
 
-	iint_sec = inode->i_security + ima_blob_sizes.lbs_inode;
-	return *iint_sec;
+	iint_lock = inode->i_security + ima_blob_sizes.lbs_inode;
+	return iint_lock->iint;
 }
 
 static inline void ima_inode_set_iint(const struct inode *inode,
 				      struct ima_iint_cache *iint)
 {
-	struct ima_iint_cache **iint_sec;
+	struct ima_iint_cache_lock *iint_lock;
 
 	if (unlikely(!inode->i_security))
 		return;
 
-	iint_sec = inode->i_security + ima_blob_sizes.lbs_inode;
-	*iint_sec = iint;
+	iint_lock = inode->i_security + ima_blob_sizes.lbs_inode;
+	iint_lock->iint = iint;
 }
 
 struct ima_iint_cache *ima_iint_find(struct inode *inode);
 struct ima_iint_cache *ima_inode_get(struct inode *inode);
+int ima_inode_alloc_security(struct inode *inode);
 void ima_inode_free_rcu(void *inode_security);
+void ima_iint_lock(struct inode *inode);
+void ima_iint_unlock(struct inode *inode);
 void __init ima_iintcache_init(void);
 
 extern const int read_idmap[];
