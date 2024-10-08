@@ -216,7 +216,7 @@ ima_inode_get_iint(const struct inode *inode)
 		return NULL;
 
 	iint_lock = ima_iint_lock_security(inode->i_security);
-	return iint_lock->iint;
+	return READ_ONCE(iint_lock->iint);
 }
 
 static inline void ima_inode_set_iint(const struct inode *inode,
@@ -228,7 +228,7 @@ static inline void ima_inode_set_iint(const struct inode *inode,
 		return;
 
 	iint_lock = ima_iint_lock_security(inode->i_security);
-	iint_lock->iint = iint;
+	WRITE_ONCE(iint_lock->iint, iint);
 }
 
 struct ima_iint_cache *ima_iint_find(struct inode *inode);
