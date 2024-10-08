@@ -88,7 +88,12 @@ static void ima_iint_free(struct ima_iint_cache *iint)
  */
 struct ima_iint_cache *ima_inode_get(struct inode *inode)
 {
+	struct ima_iint_cache_lock *iint_lock;
 	struct ima_iint_cache *iint;
+
+	iint_lock = ima_inode_security(inode->i_security);
+	if (iint_lock)
+		lockdep_assert_held(&iint_lock->mutex);
 
 	iint = ima_iint_find(inode);
 	if (iint)
