@@ -35,7 +35,7 @@ struct ima_iint_cache *ima_iint_find(struct inode *inode)
 	if (!iint_lock)
 		return NULL;
 
-	return iint_lock->iint;
+	return READ_ONCE(iint_lock->iint);
 }
 
 #define IMA_MAX_NESTING (FILESYSTEM_MAX_STACK_DEPTH + 1)
@@ -102,7 +102,7 @@ struct ima_iint_cache *ima_inode_get(struct inode *inode)
 
 	lockdep_assert_held(&iint_lock->mutex);
 
-	iint = iint_lock->iint;
+	iint = READ_ONCE(iint_lock->iint);
 	if (iint)
 		return iint;
 
@@ -113,7 +113,7 @@ struct ima_iint_cache *ima_inode_get(struct inode *inode)
 	ima_iint_init_always(iint, inode);
 
 	inode->i_flags |= S_IMA;
-	iint_lock->iint = iint;
+	WRITE_ONCE(iint_lock->iint, iint);
 
 	return iint;
 }
