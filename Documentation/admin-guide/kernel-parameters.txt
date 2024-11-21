@@ -2083,6 +2083,9 @@
 			Format: { "off" | "enforce" | "fix" | "log" }
 			default: "enforce"
 
+			ima_appraise=fix should be used in conjunction with
+			evm=fix, when also inode metadata should be fixed.
+
 	ima_appraise_tcb [IMA] Deprecated.  Use ima_policy= instead.
 			The builtin appraise policy appraises all files
 			owned by uid=0.
