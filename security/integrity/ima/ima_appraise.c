@@ -509,8 +509,6 @@ int ima_appraise_measurement(enum ima_hooks func, struct ima_iint_cache *iint,
 		}
 
 		status = INTEGRITY_NOLABEL;
-		if (file->f_mode & FMODE_CREATED)
-			iint->flags |= IMA_NEW_FILE;
 		if ((iint->flags & IMA_NEW_FILE) &&
 		    (!(iint->flags & IMA_DIGSIG_REQUIRED) ||
 		     (inode->i_size == 0)))

@@ -3747,8 +3747,14 @@ static const char *open_last_lookups(struct nameidata *nd,
 		inode_lock_shared(dir->d_inode);
 	dentry = lookup_open(nd, file, op, got_write);
 	if (!IS_ERR(dentry)) {
-		if (file->f_mode & FMODE_CREATED)
+		if (file->f_mode & FMODE_CREATED) {
+			struct mnt_idmap *idmap = mnt_idmap(nd->path.mnt);
+
 			fsnotify_create(dir->d_inode, dentry);
+
+			/* O_CREAT creates a regular file. */
+			security_path_post_mknod(idmap, dentry);
+		}
 		if (file->f_mode & FMODE_OPENED)
 			fsnotify_open(file);
 	}
