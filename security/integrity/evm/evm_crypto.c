@@ -335,9 +335,14 @@ static int evm_is_immutable(struct dentry *dentry, struct inode *inode)
 	struct evm_iint_cache *iint;
 	int rc = 0;
 
-	iint = evm_iint_inode(inode);
-	if (iint && (iint->flags & EVM_IMMUTABLE_DIGSIG))
+	evm_iint_lock(inode);
+	iint = evm_iint_find(inode);
+	if (iint && (iint->flags & EVM_IMMUTABLE_DIGSIG)) {
+		evm_iint_unlock(inode);
 		return 1;
+	}
+
+	evm_iint_unlock(inode);
 
 	/* Do this the hard way */
 	rc = vfs_getxattr_alloc(&nop_mnt_idmap, dentry, XATTR_NAME_EVM,
@@ -367,7 +372,7 @@ int evm_update_evmxattr(struct dentry *dentry, const char *xattr_name,
 			const char *xattr_value, size_t xattr_value_len)
 {
 	struct inode *inode = d_backing_inode(dentry);
-	struct evm_iint_cache *iint = evm_iint_inode(inode);
+	struct evm_iint_cache *iint;
 	struct evm_digest data;
 	int rc = 0;
 
@@ -381,9 +386,12 @@ int evm_update_evmxattr(struct dentry *dentry, const char *xattr_name,
 	if (rc)
 		return -EPERM;
 
+	evm_iint_lock(inode);
+	iint = evm_iint_find(inode);
 	data.hdr.algo = HASH_ALGO_SHA1;
 	rc = evm_calc_hmac(dentry, xattr_name, xattr_value,
 			   xattr_value_len, &data, iint);
+	evm_iint_unlock(inode);
 	if (rc == 0) {
 		data.hdr.xattr.sha1.type = EVM_XATTR_HMAC;
 		rc = __vfs_setxattr_noperm(&nop_mnt_idmap, dentry,
