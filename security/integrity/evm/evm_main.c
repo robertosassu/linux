@@ -185,20 +185,27 @@ static enum integrity_status evm_verify_hmac(struct dentry *dentry,
 	enum integrity_status evm_status = INTEGRITY_PASS;
 	struct evm_digest digest;
 	struct inode *inode = d_backing_inode(dentry);
-	struct evm_iint_cache *iint = evm_iint_inode(inode);
+	struct evm_iint_cache *iint;
 	int rc, xattr_len, evm_immutable = 0;
 
+	evm_iint_lock(inode);
+	iint = evm_inode_get(inode);
+
 	if (iint && (iint->evm_status == INTEGRITY_PASS ||
-		     iint->evm_status == INTEGRITY_PASS_IMMUTABLE))
+		     iint->evm_status == INTEGRITY_PASS_IMMUTABLE)) {
+		evm_iint_unlock(inode);
 		return iint->evm_status;
+	}
 
 	/*
 	 * On unsupported filesystems without EVM_INIT_X509 enabled, skip
 	 * signature verification.
 	 */
 	if (!(evm_initialized & EVM_INIT_X509) &&
-	    is_unsupported_hmac_fs(dentry))
+	    is_unsupported_hmac_fs(dentry)) {
+		evm_iint_unlock(inode);
 		return INTEGRITY_UNKNOWN;
+	}
 
 	/* if status is not PASS, try to check again - against -ENOMEM */
 
@@ -292,6 +299,7 @@ static enum integrity_status evm_verify_hmac(struct dentry *dentry,
 out:
 	if (iint)
 		iint->evm_status = evm_status;
+	evm_iint_unlock(inode);
 	kfree(xattr_data);
 	return evm_status;
 }
@@ -527,7 +535,7 @@ static int evm_protect_xattr(struct mnt_idmap *idmap,
 		if (evm_hmac_disabled())
 			return 0;
 
-		iint = evm_iint_inode(d_backing_inode(dentry));
+		iint = evm_iint_find(d_backing_inode(dentry));
 		if (iint && (iint->flags & EVM_NEW_FILE))
 			return 0;
 
@@ -732,7 +740,7 @@ static void evm_reset_status(struct inode *inode)
 {
 	struct evm_iint_cache *iint;
 
-	iint = evm_iint_inode(inode);
+	iint = evm_iint_find(inode);
 	if (iint)
 		iint->evm_status = INTEGRITY_UNKNOWN;
 }
@@ -748,7 +756,7 @@ static void evm_reset_status(struct inode *inode)
  */
 bool evm_metadata_changed(struct inode *inode, struct inode *metadata_inode)
 {
-	struct evm_iint_cache *iint = evm_iint_inode(inode);
+	struct evm_iint_cache *iint = evm_iint_find(inode);
 	bool ret = false;
 
 	if (iint) {
@@ -1064,41 +1072,44 @@ out:
 }
 EXPORT_SYMBOL_GPL(evm_inode_init_security);
 
-static int evm_inode_alloc_security(struct inode *inode)
-{
-	struct evm_iint_cache *iint = evm_iint_inode(inode);
-
-	/* Called by security_inode_alloc(), it cannot be NULL. */
-	iint->flags = 0UL;
-	iint->evm_status = INTEGRITY_UNKNOWN;
-
-	return 0;
-}
-
 static void evm_file_release(struct file *file)
 {
 	struct inode *inode = file_inode(file);
-	struct evm_iint_cache *iint = evm_iint_inode(inode);
+	struct evm_iint_cache *iint;
 	fmode_t mode = file->f_mode;
 
 	if (!S_ISREG(inode->i_mode) || !(mode & FMODE_WRITE))
 		return;
 
+	evm_iint_lock(inode);
+	iint = evm_iint_find(inode);
 	if (iint && iint->flags & EVM_NEW_FILE &&
 	    atomic_read(&inode->i_writecount) == 1)
 		iint->flags &= ~EVM_NEW_FILE;
+	evm_iint_unlock(inode);
 }
 
 static void evm_post_path_mknod(struct mnt_idmap *idmap, struct dentry *dentry)
 {
 	struct inode *inode = d_backing_inode(dentry);
-	struct evm_iint_cache *iint = evm_iint_inode(inode);
+	struct evm_iint_cache *iint;
 
-	if (!S_ISREG(inode->i_mode))
+	evm_iint_lock(inode);
+	/*
+	 * We have to allocate metadata, we don't know if xattrs will be
+	 * protected with EVM or not.
+	 */
+	iint = evm_inode_get(inode);
+
+	if (!S_ISREG(inode->i_mode)) {
+		evm_iint_unlock(inode);
 		return;
+	}
 
 	if (iint)
 		iint->flags |= EVM_NEW_FILE;
+
+	evm_iint_unlock(inode);
 }
 
 #ifdef CONFIG_EVM_LOAD_X509
@@ -1154,6 +1165,7 @@ static struct security_hook_list evm_hooks[] __ro_after_init = {
 	LSM_HOOK_INIT(inode_post_removexattr, evm_inode_post_removexattr),
 	LSM_HOOK_INIT(inode_init_security, evm_inode_init_security),
 	LSM_HOOK_INIT(inode_alloc_security, evm_inode_alloc_security),
+	LSM_HOOK_INIT(inode_free_security_rcu, evm_inode_free_rcu),
 	LSM_HOOK_INIT(file_release, evm_file_release),
 	LSM_HOOK_INIT(path_post_mknod, evm_post_path_mknod),
 };
@@ -1165,12 +1177,13 @@ static const struct lsm_id evm_lsmid = {
 
 static int __init init_evm_lsm(void)
 {
+	evm_iintcache_init();
 	security_add_hooks(evm_hooks, ARRAY_SIZE(evm_hooks), &evm_lsmid);
 	return 0;
 }
 
 struct lsm_blob_sizes evm_blob_sizes __ro_after_init = {
-	.lbs_inode = sizeof(struct evm_iint_cache),
+	.lbs_inode = sizeof(struct evm_iint_cache_lock),
 	.lbs_xattr_count = 1,
 };
 
