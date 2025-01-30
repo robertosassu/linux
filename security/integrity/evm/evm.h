@@ -42,15 +42,28 @@ struct evm_iint_cache {
 	struct integrity_inode_attributes metadata_inode;
 };
 
+struct evm_iint_cache_lock {
+	struct mutex mutex;
+	struct evm_iint_cache *iint;
+};
+
 extern struct lsm_blob_sizes evm_blob_sizes;
 
-static inline struct evm_iint_cache *evm_iint_inode(const struct inode *inode)
+static inline struct evm_iint_cache_lock *evm_inode_security(void *i_security)
 {
-	if (unlikely(!inode->i_security))
+	if (unlikely(!i_security))
 		return NULL;
 
-	return inode->i_security + evm_blob_sizes.lbs_inode;
+	return i_security + evm_blob_sizes.lbs_inode;
 }
+
+struct evm_iint_cache *evm_iint_find(struct inode *inode);
+struct evm_iint_cache *evm_inode_get(struct inode *inode);
+int evm_inode_alloc_security(struct inode *inode);
+void evm_inode_free_rcu(void *inode_security);
+void evm_iint_lock(struct inode *inode);
+void evm_iint_unlock(struct inode *inode);
+void evm_iintcache_init(void);
 
 extern int evm_initialized;
 
