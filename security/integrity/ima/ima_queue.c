@@ -98,12 +98,14 @@ static int get_binary_runtime_size(struct ima_template_entry *entry)
  * (Called with ima_extend_list_mutex held.)
  */
 static int ima_add_digest_entry(struct ima_template_entry *entry,
-				bool update_htable)
+				bool update_htable,
+				struct ima_queue_entry *qe)
 {
-	struct ima_queue_entry *qe;
 	unsigned int key;
 
-	qe = kmalloc(sizeof(*qe), GFP_KERNEL);
+	if (qe == NULL)
+		qe = kmalloc(sizeof(*qe), GFP_KERNEL);
+
 	if (qe == NULL) {
 		pr_err("OUT OF MEMORY ERROR creating queue entry\n");
 		return -ENOMEM;
@@ -171,6 +173,7 @@ int ima_add_template_entry(struct ima_template_entry *entry, int violation,
 	struct tpm_digest *digests_arg = entry->digests;
 	const char *audit_cause = "hash_added";
 	char tpm_audit_cause[AUDIT_CAUSE_LEN_MAX];
+	struct ima_queue_entry *qe;
 	int audit_info = 1;
 	int result = 0, tpmresult = 0;
 
@@ -195,11 +198,11 @@ int ima_add_template_entry(struct ima_template_entry *entry, int violation,
 		}
 	}
 
-	result = ima_add_digest_entry(entry,
-				      !IS_ENABLED(CONFIG_IMA_DISABLE_HTABLE));
-	if (result < 0) {
+	qe = kmalloc(sizeof(*qe), GFP_KERNEL);
+	if (qe == NULL) {
 		audit_cause = "ENOMEM";
 		audit_info = 0;
+		result = -ENOMEM;
 		goto out;
 	}
 
@@ -212,11 +215,17 @@ int ima_add_template_entry(struct ima_template_entry *entry, int violation,
 			 tpmresult);
 		audit_cause = tpm_audit_cause;
 		audit_info = 0;
+		/* Do not pass -EEXISTS, it is taken as measurement success. */
+		result = (tpmresult != -EEXIST) ? tpmresult : -EIO;
+		goto out;
 	}
+	/* It is not expected to not fail, qe is already allocated. */
+	WARN_ON_ONCE(ima_add_digest_entry(entry,
+				!IS_ENABLED(CONFIG_IMA_DISABLE_HTABLE), qe));
 out:
 	mutex_unlock(&ima_extend_list_mutex);
 	integrity_audit_msg(AUDIT_INTEGRITY_PCR, inode, filename,
-			    op, audit_cause, result, audit_info);
+			    op, audit_cause, (tpmresult) ?: result, audit_info);
 	return result;
 }
 
@@ -225,7 +234,7 @@ int ima_restore_measurement_entry(struct ima_template_entry *entry)
 	int result = 0;
 
 	mutex_lock(&ima_extend_list_mutex);
-	result = ima_add_digest_entry(entry, 0);
+	result = ima_add_digest_entry(entry, 0, NULL);
 	mutex_unlock(&ima_extend_list_mutex);
 	return result;
 }
