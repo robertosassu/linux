@@ -130,18 +130,21 @@ int ima_store_template(struct ima_template_entry *entry,
  * By extending the PCR with 0xFF's instead of with zeroes, the PCR
  * value is invalidated.
  */
-void ima_add_violation(struct file *file, const unsigned char *filename,
-		       struct ima_iint_cache *iint, const char *op,
-		       const char *cause)
+int ima_add_violation(struct file *file, const unsigned char *filename,
+		      struct ima_iint_cache *iint, const char *op,
+		      const char *cause)
 {
 	struct ima_template_entry *entry;
-	struct inode *inode = file_inode(file);
+	struct inode *inode = NULL;
 	struct ima_event_data event_data = { .iint = iint,
 					     .file = file,
 					     .filename = filename,
 					     .violation = cause };
 	int violation = 1;
 	int result;
+
+	if (file)
+		inode = file_inode(file);
 
 	/* can overflow, only indicator */
 	atomic_long_inc(&ima_htable.violations);
@@ -158,6 +161,7 @@ void ima_add_violation(struct file *file, const unsigned char *filename,
 err_out:
 	integrity_audit_msg(AUDIT_INTEGRITY_PCR, inode, filename,
 			    op, cause, result, 0);
+	return result;
 }
 
 /**
@@ -345,11 +349,11 @@ out:
  *
  * Must be called with iint->mutex held.
  */
-void ima_store_measurement(struct ima_iint_cache *iint, struct file *file,
-			   const unsigned char *filename,
-			   struct evm_ima_xattr_data *xattr_value,
-			   int xattr_len, const struct modsig *modsig, int pcr,
-			   struct ima_template_desc *template_desc)
+int ima_store_measurement(struct ima_iint_cache *iint, struct file *file,
+			  const unsigned char *filename,
+			  struct evm_ima_xattr_data *xattr_value,
+			  int xattr_len, const struct modsig *modsig, int pcr,
+			  struct ima_template_desc *template_desc)
 {
 	static const char op[] = "add_template_measure";
 	static const char audit_cause[] = "ENOMEM";
@@ -371,13 +375,13 @@ void ima_store_measurement(struct ima_iint_cache *iint, struct file *file,
 	 * the measurement list.
 	 */
 	if (iint->measured_pcrs & (0x1 << pcr) && !modsig)
-		return;
+		return 0;
 
 	result = ima_alloc_init_template(&event_data, &entry, template_desc);
 	if (result < 0) {
 		integrity_audit_msg(AUDIT_INTEGRITY_PCR, inode, filename,
 				    op, audit_cause, result, 0);
-		return;
+		return result;
 	}
 
 	result = ima_store_template(entry, violation, inode, filename, pcr);
@@ -385,8 +389,13 @@ void ima_store_measurement(struct ima_iint_cache *iint, struct file *file,
 		iint->flags |= IMA_MEASURED;
 		iint->measured_pcrs |= (0x1 << pcr);
 	}
-	if (result < 0)
+	if (result < 0) {
 		ima_free_template_entry(entry);
+		if (result == -EEXIST)
+			result = 0;
+	}
+
+	return result;
 }
 
 void ima_audit_measurement(struct ima_iint_cache *iint,
