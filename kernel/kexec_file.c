@@ -273,8 +273,10 @@ kimage_file_prepare_segments(struct kimage *image, int kernel_fd, int initrd_fd,
 			goto out;
 		}
 
-		ima_kexec_cmdline(kernel_fd, image->cmdline_buf,
-				  image->cmdline_buf_len - 1);
+		ret = ima_kexec_cmdline(kernel_fd, image->cmdline_buf,
+					image->cmdline_buf_len - 1);
+		if (ret < 0)
+			goto out;
 	}
 
 	/* IMA needs to pass the measurement list to the next kernel. */

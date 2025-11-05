@@ -18,7 +18,7 @@ struct linux_binprm;
 extern enum hash_algo ima_get_current_hash_algo(void);
 extern int ima_file_hash(struct file *file, char *buf, size_t buf_size);
 extern int ima_inode_hash(struct inode *inode, char *buf, size_t buf_size);
-extern void ima_kexec_cmdline(int kernel_fd, const void *buf, int size);
+extern int ima_kexec_cmdline(int kernel_fd, const void *buf, int size);
 extern int ima_measure_critical_data(const char *event_label,
 				     const char *event_name,
 				     const void *buf, size_t buf_len,
@@ -53,7 +53,10 @@ static inline int ima_inode_hash(struct inode *inode, char *buf, size_t buf_size
 	return -EOPNOTSUPP;
 }
 
-static inline void ima_kexec_cmdline(int kernel_fd, const void *buf, int size) {}
+static inline int ima_kexec_cmdline(int kernel_fd, const void *buf, int size)
+{
+	return 0;
+}
 
 static inline int ima_measure_critical_data(const char *event_label,
 					     const char *event_name,

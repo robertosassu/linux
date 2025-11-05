@@ -134,16 +134,17 @@ static int mmap_violation_check(enum ima_hooks func, struct file *file,
  *	  could result in a file measurement error.
  *
  */
-static void ima_rdwr_violation_check(struct file *file,
-				     struct ima_iint_cache *iint,
-				     int must_measure,
-				     char **pathbuf,
-				     const char **pathname,
-				     char *filename)
+static int ima_rdwr_violation_check(struct file *file,
+				    struct ima_iint_cache *iint,
+				    int must_measure,
+				    char **pathbuf,
+				    const char **pathname,
+				    char *filename)
 {
 	struct inode *inode = file_inode(file);
 	fmode_t mode = file->f_mode;
 	bool send_tomtou = false, send_writers = false;
+	int rc = 0;
 
 	if (mode & FMODE_WRITE) {
 		if (atomic_read(&inode->i_readcount) && IS_IMA(inode)) {
@@ -168,16 +169,18 @@ static void ima_rdwr_violation_check(struct file *file,
 	}
 
 	if (!send_tomtou && !send_writers)
-		return;
+		return 0;
 
 	*pathname = ima_d_path(&file->f_path, pathbuf, filename);
 
 	if (send_tomtou)
-		ima_add_violation(file, *pathname, iint,
-				  "invalid_pcr", "ToMToU");
-	if (send_writers)
-		ima_add_violation(file, *pathname, iint,
-				  "invalid_pcr", "open_writers");
+		rc = ima_add_violation(file, *pathname, iint,
+				       "invalid_pcr", "ToMToU");
+	if (send_writers && rc == 0)
+		rc = ima_add_violation(file, *pathname, iint,
+				       "invalid_pcr", "open_writers");
+
+	return rc;
 }
 
 static void ima_check_last_writer(struct ima_iint_cache *iint,
@@ -244,7 +247,7 @@ static int process_measurement(struct file *file, const struct cred *cred,
 	char *pathbuf = NULL;
 	char filename[NAME_MAX];
 	const char *pathname = NULL;
-	int rc = 0, action, must_appraise = 0;
+	int rc = 0, measure_rc = 0, action, must_appraise = 0;
 	int pcr = CONFIG_IMA_MEASURE_PCR_IDX;
 	struct evm_ima_xattr_data *xattr_value = NULL;
 	struct modsig *modsig = NULL;
@@ -281,17 +284,21 @@ static int process_measurement(struct file *file, const struct cred *cred,
 
 	if (action) {
 		iint = ima_inode_get(inode);
-		if (!iint)
+		if (!iint) {
 			rc = -ENOMEM;
+			measure_rc = rc;
+		}
 	}
 
 	if (!rc && violation_check)
-		ima_rdwr_violation_check(file, iint, action & IMA_MEASURE,
-					 &pathbuf, &pathname, filename);
+		measure_rc = ima_rdwr_violation_check(file, iint,
+						      action & IMA_MEASURE,
+						      &pathbuf, &pathname,
+						      filename);
 
 	inode_unlock(inode);
 
-	if (rc)
+	if (rc || measure_rc)
 		goto out;
 	if (!action)
 		goto out;
@@ -393,6 +400,10 @@ static int process_measurement(struct file *file, const struct cred *cred,
 		 */
 		if (iint->flags & IMA_MODSIG_ALLOWED) {
 			rc = ima_read_modsig(func, buf, size, &modsig);
+			if (rc != 0) {
+				measure_rc = rc;
+				goto out_locked;
+			}
 
 			if (!rc && ima_template_has_modsig(template_desc) &&
 			    iint->flags & IMA_MEASURED)
@@ -403,16 +414,18 @@ static int process_measurement(struct file *file, const struct cred *cred,
 	hash_algo = ima_get_hash_algo(xattr_value, xattr_len);
 
 	rc = ima_collect_measurement(iint, file, buf, size, hash_algo, modsig);
-	if (rc != 0 && rc != -EBADF && rc != -EINVAL)
+	if (rc != 0 && rc != -EBADF && rc != -EINVAL) {
+		measure_rc = rc;
 		goto out_locked;
+	}
 
 	if (!pathbuf)	/* ima_rdwr_violation possibly pre-fetched */
 		pathname = ima_d_path(&file->f_path, &pathbuf, filename);
 
 	if (action & IMA_MEASURE)
-		ima_store_measurement(iint, file, pathname,
-				      xattr_value, xattr_len, modsig, pcr,
-				      template_desc);
+		measure_rc = ima_store_measurement(iint, file, pathname,
+						   xattr_value, xattr_len,
+						   modsig, pcr, template_desc);
 	if (rc == 0 && (action & IMA_APPRAISE_SUBMASK)) {
 		rc = ima_check_blacklist(iint, modsig, pcr);
 		if (rc != -EPERM) {
@@ -457,6 +470,8 @@ out:
 		if (file->f_mode & FMODE_WRITE)
 			set_bit(IMA_UPDATE_XATTR, &iint->atomic_flags);
 	}
+	if (measure_rc)
+		return measure_rc;
 	return 0;
 }
 
@@ -1125,13 +1140,16 @@ int process_buffer_measurement(struct mnt_idmap *idmap,
 	if (ret < 0) {
 		audit_cause = "store_entry";
 		ima_free_template_entry(entry);
+		if (ret == -EEXIST)
+			ret = 0;
 	}
 
 out:
-	if (ret < 0)
+	if (ret < 0) {
 		integrity_audit_message(AUDIT_INTEGRITY_PCR, NULL, eventname,
 					func_measure_str(func),
 					audit_cause, ret, 0, ret);
+	}
 
 	return ret;
 }
@@ -1144,18 +1162,19 @@ out:
  *
  * Buffers can only be measured, not appraised.
  */
-void ima_kexec_cmdline(int kernel_fd, const void *buf, int size)
+int ima_kexec_cmdline(int kernel_fd, const void *buf, int size)
 {
 	if (!buf || !size)
-		return;
+		return 0;
 
 	CLASS(fd, f)(kernel_fd);
 	if (fd_empty(f))
-		return;
+		return 0;
 
-	process_buffer_measurement(file_mnt_idmap(fd_file(f)), file_inode(fd_file(f)),
-				   buf, size, "kexec-cmdline", KEXEC_CMDLINE, 0,
-				   NULL, false, NULL, 0);
+	return process_buffer_measurement(file_mnt_idmap(fd_file(f)),
+					  file_inode(fd_file(f)), buf, size,
+					  "kexec-cmdline", KEXEC_CMDLINE, 0,
+					  NULL, false, NULL, 0);
 }
 
 /**
