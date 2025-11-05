@@ -268,9 +268,9 @@ int ima_calc_buffer_hash(const void *buf, loff_t len,
 int ima_calc_field_array_hash(struct ima_field_data *field_data,
 			      struct ima_template_entry *entry);
 int ima_calc_boot_aggregate(struct ima_digest_data *hash);
-void ima_add_violation(struct file *file, const unsigned char *filename,
-		       struct ima_iint_cache *iint, const char *op,
-		       const char *cause);
+int ima_add_violation(struct file *file, const unsigned char *filename,
+		      struct ima_iint_cache *iint, const char *op,
+		      const char *cause);
 int ima_init_crypto(void);
 void ima_putc(struct seq_file *m, void *data, int datalen);
 void ima_print_digest(struct seq_file *m, u8 *digest, u32 size);
@@ -388,11 +388,11 @@ int ima_must_measure(struct inode *inode, int mask, enum ima_hooks func);
 int ima_collect_measurement(struct ima_iint_cache *iint, struct file *file,
 			    void *buf, loff_t size, enum hash_algo algo,
 			    struct modsig *modsig);
-void ima_store_measurement(struct ima_iint_cache *iint, struct file *file,
-			   const unsigned char *filename,
-			   struct evm_ima_xattr_data *xattr_value,
-			   int xattr_len, const struct modsig *modsig, int pcr,
-			   struct ima_template_desc *template_desc);
+int ima_store_measurement(struct ima_iint_cache *iint, struct file *file,
+			  const unsigned char *filename,
+			  struct evm_ima_xattr_data *xattr_value,
+			  int xattr_len, const struct modsig *modsig, int pcr,
+			  struct ima_template_desc *template_desc);
 int process_buffer_measurement(struct mnt_idmap *idmap,
 			       struct inode *inode, const void *buf, int size,
 			       const char *eventname, enum ima_hooks func,
