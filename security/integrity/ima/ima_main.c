@@ -462,6 +462,9 @@ out_locked:
 	kfree(xattr_value);
 	ima_free_modsig(modsig);
 out:
+	if (measure_rc)
+		measure_rc = ima_invalidate_measurement_list(pcr, measure_rc,
+							     inode, pathname);
 	if (pathbuf)
 		__putname(pathbuf);
 	if (must_appraise) {
@@ -1149,6 +1152,8 @@ out:
 		integrity_audit_message(AUDIT_INTEGRITY_PCR, NULL, eventname,
 					func_measure_str(func),
 					audit_cause, ret, 0, ret);
+		ret = ima_invalidate_measurement_list(pcr, ret, inode,
+						      eventname);
 	}
 
 	return ret;

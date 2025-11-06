@@ -230,6 +230,26 @@ out:
 	return result;
 }
 
+int ima_invalidate_measurement_list(int pcr, int error, struct inode *inode,
+				    const unsigned char *filename)
+{
+	char tpm_audit_cause[AUDIT_CAUSE_LEN_MAX];
+	int result;
+
+	integrity_audit_msg(AUDIT_INTEGRITY_PCR, inode, filename,
+			    "invalid_pcr", "measure_error", error, 1);
+
+	result = ima_pcr_extend(digests, pcr);
+	if (result != 0) {
+		snprintf(tpm_audit_cause, AUDIT_CAUSE_LEN_MAX, "TPM_error(%d)",
+			 result);
+		integrity_audit_msg(AUDIT_INTEGRITY_PCR, inode, filename,
+				    "deny_op", tpm_audit_cause, result, 0);
+	}
+
+	return result;
+}
+
 int ima_restore_measurement_entry(struct ima_template_entry *entry)
 {
 	int result = 0;
