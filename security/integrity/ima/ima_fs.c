@@ -24,7 +24,13 @@
 
 #include "ima.h"
 
+/* Possible requests: 0\n (make snapshot) or 1\n (delete snapshot) */
+#define SNAPSHOT_REQ_LENGTH 2
+#define SNAPSHOT_REQ_MAKE '0'
+#define SNAPSHOT_REQ_DEL '1'
+
 static DEFINE_MUTEX(ima_write_mutex);
+static DECLARE_RWSEM(ima_measure_sem);
 
 bool ima_canonical_fmt;
 static int __init default_canonical_fmt_setup(char *str)
@@ -74,14 +80,15 @@ static const struct file_operations ima_measurements_count_ops = {
 };
 
 /* returns pointer to hlist_node */
-static void *ima_measurements_start(struct seq_file *m, loff_t *pos)
+static void *_ima_measurements_start(struct seq_file *m, loff_t *pos,
+				     struct list_head *head)
 {
 	loff_t l = *pos;
 	struct ima_queue_entry *qe;
 
 	/* we need a lock since pos could point beyond last element */
 	rcu_read_lock();
-	list_for_each_entry_rcu(qe, &ima_measurements, later) {
+	list_for_each_entry_rcu(qe, head, later) {
 		if (!l--) {
 			rcu_read_unlock();
 			return qe;
@@ -91,7 +98,19 @@ static void *ima_measurements_start(struct seq_file *m, loff_t *pos)
 	return NULL;
 }
 
-static void *ima_measurements_next(struct seq_file *m, void *v, loff_t *pos)
+static void *ima_measurements_start(struct seq_file *m, loff_t *pos)
+{
+	return _ima_measurements_start(m, pos, &ima_measurements);
+}
+
+/* returns pointer to hlist_node */
+static void *ima_measurements_snap_start(struct seq_file *m, loff_t *pos)
+{
+	return _ima_measurements_start(m, pos, &ima_measurements_snap);
+}
+
+static void *_ima_measurements_next(struct seq_file *m, void *v, loff_t *pos,
+				    struct list_head *head)
 {
 	struct ima_queue_entry *qe = v;
 
@@ -103,7 +122,18 @@ static void *ima_measurements_next(struct seq_file *m, void *v, loff_t *pos)
 	rcu_read_unlock();
 	(*pos)++;
 
-	return (&qe->later == &ima_measurements) ? NULL : qe;
+	return (&qe->later == head) ? NULL : qe;
+}
+
+static void *ima_measurements_next(struct seq_file *m, void *v, loff_t *pos)
+{
+	return _ima_measurements_next(m, v, pos, &ima_measurements);
+}
+
+static void *ima_measurements_snap_next(struct seq_file *m, void *v,
+					loff_t *pos)
+{
+	return _ima_measurements_next(m, v, pos, &ima_measurements_snap);
 }
 
 static void ima_measurements_stop(struct seq_file *m, void *v)
@@ -202,16 +232,121 @@ static const struct seq_operations ima_measurments_seqops = {
 	.show = ima_measurements_show
 };
 
+static int _ima_measurements_open(struct inode *inode, struct file *file,
+				  const struct seq_operations *seq_ops)
+{
+	bool write = !!(file->f_mode & FMODE_WRITE);
+	int ret;
+
+	if (write && !capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	if ((write && !down_write_trylock(&ima_measure_sem)) ||
+	    (!write && !down_read_trylock(&ima_measure_sem)))
+		return -EBUSY;
+
+	ret = seq_open(file, seq_ops);
+	if (ret < 0) {
+		if (write)
+			up_write(&ima_measure_sem);
+		else
+			up_read(&ima_measure_sem);
+	}
+
+	return ret;
+}
+
 static int ima_measurements_open(struct inode *inode, struct file *file)
 {
-	return seq_open(file, &ima_measurments_seqops);
+	return _ima_measurements_open(inode, file, &ima_measurments_seqops);
+}
+
+static int ima_measurements_release(struct inode *inode, struct file *file)
+{
+	bool write = !!(file->f_mode & FMODE_WRITE);
+	int ret;
+
+	ret = seq_release(inode, file);
+	if (!ret) {
+		if (write)
+			up_write(&ima_measure_sem);
+		else
+			up_read(&ima_measure_sem);
+	}
+
+	return ret;
 }
 
 static const struct file_operations ima_measurements_ops = {
 	.open = ima_measurements_open,
 	.read = seq_read,
 	.llseek = seq_lseek,
-	.release = seq_release,
+	.release = ima_measurements_release,
+};
+
+static const struct seq_operations ima_measurments_snap_seqops = {
+	.start = ima_measurements_snap_start,
+	.next = ima_measurements_snap_next,
+	.stop = ima_measurements_stop,
+	.show = ima_measurements_show
+};
+
+static int ima_measurements_snap_open(struct inode *inode, struct file *file)
+{
+	return _ima_measurements_open(inode, file,
+				      &ima_measurments_snap_seqops);
+}
+
+static ssize_t ima_measurements_snap_read(struct file *file, char __user *buf,
+					  size_t size, loff_t *ppos)
+{
+	if (!ima_measurement_snap_exists)
+		return -ENOENT;
+
+	return seq_read(file, buf, size, ppos);
+}
+
+static ssize_t ima_measurements_snap_write(struct file *file,
+					   const char __user *buf,
+					   size_t datalen, loff_t *ppos)
+{
+	unsigned char req[SNAPSHOT_REQ_LENGTH];
+	int ret;
+
+	if (*ppos > 0 || datalen != SNAPSHOT_REQ_LENGTH)
+		return -EINVAL;
+
+	ret = copy_from_user(req, buf, datalen);
+	if (ret < 0)
+		return ret;
+
+	if (req[1] != '\n')
+		return -EINVAL;
+
+	switch (req[0]) {
+	case SNAPSHOT_REQ_MAKE:
+		ret = ima_queue_make_snapshot();
+		break;
+	case SNAPSHOT_REQ_DEL:
+		ret = ima_queue_delete_snapshot();
+		break;
+	default:
+		ret = -EINVAL;
+		break;
+	}
+
+	if (ret < 0)
+		return ret;
+
+	return datalen;
+}
+
+static const struct file_operations ima_measurements_snap_ops = {
+	.open = ima_measurements_snap_open,
+	.read = ima_measurements_snap_read,
+	.write = ima_measurements_snap_write,
+	.llseek = seq_lseek,
+	.release = ima_measurements_release,
 };
 
 void ima_print_digest(struct seq_file *m, u8 *digest, u32 size)
@@ -279,14 +414,37 @@ static const struct seq_operations ima_ascii_measurements_seqops = {
 
 static int ima_ascii_measurements_open(struct inode *inode, struct file *file)
 {
-	return seq_open(file, &ima_ascii_measurements_seqops);
+	return _ima_measurements_open(inode, file,
+				      &ima_ascii_measurements_seqops);
 }
 
 static const struct file_operations ima_ascii_measurements_ops = {
 	.open = ima_ascii_measurements_open,
 	.read = seq_read,
 	.llseek = seq_lseek,
-	.release = seq_release,
+	.release = ima_measurements_release,
+};
+
+static const struct seq_operations ima_ascii_measurements_snap_seqops = {
+	.start = ima_measurements_snap_start,
+	.next = ima_measurements_snap_next,
+	.stop = ima_measurements_stop,
+	.show = ima_ascii_measurements_show
+};
+
+static int ima_ascii_measurements_snap_open(struct inode *inode,
+					    struct file *file)
+{
+	return _ima_measurements_open(inode, file,
+				      &ima_ascii_measurements_snap_seqops);
+}
+
+static const struct file_operations ima_ascii_measurements_snap_ops = {
+	.open = ima_ascii_measurements_snap_open,
+	.read = ima_measurements_snap_read,
+	.write = ima_measurements_snap_write,
+	.llseek = seq_lseek,
+	.release = ima_measurements_release,
 };
 
 static ssize_t ima_read_policy(char *path)
@@ -419,6 +577,25 @@ static int __init create_securityfs_measurement_lists(void)
 						&ima_measurements_ops);
 		if (IS_ERR(dentry))
 			return PTR_ERR(dentry);
+
+		sprintf(file_name, "ascii_runtime_measurements_snap_%s",
+			hash_algo_name[algo]);
+		dentry = securityfs_create_file(file_name,
+					S_IRUSR | S_IRGRP | S_IWUSR | S_IWGRP,
+					ima_dir, (void *)(uintptr_t)i,
+					&ima_ascii_measurements_snap_ops);
+		if (IS_ERR(dentry))
+			return PTR_ERR(dentry);
+
+		sprintf(file_name, "binary_runtime_measurements_snap_%s",
+			hash_algo_name[algo]);
+		dentry = securityfs_create_file(file_name,
+						S_IRUSR | S_IRGRP |
+						S_IWUSR | S_IWGRP,
+						ima_dir, (void *)(uintptr_t)i,
+						&ima_measurements_snap_ops);
+		if (IS_ERR(dentry))
+			return PTR_ERR(dentry);
 	}
 
 	return 0;
@@ -523,6 +700,20 @@ int __init ima_fs_init(void)
 
 	dentry = securityfs_create_symlink("ascii_runtime_measurements", ima_dir,
 				      "ascii_runtime_measurements_sha1", NULL);
+	if (IS_ERR(dentry)) {
+		ret = PTR_ERR(dentry);
+		goto out;
+	}
+
+	dentry = securityfs_create_symlink("binary_runtime_measurements_snap",
+			ima_dir, "binary_runtime_measurements_snap_sha1", NULL);
+	if (IS_ERR(dentry)) {
+		ret = PTR_ERR(dentry);
+		goto out;
+	}
+
+	dentry = securityfs_create_symlink("ascii_runtime_measurements_snap",
+			ima_dir, "ascii_runtime_measurements_snap_sha1", NULL);
 	if (IS_ERR(dentry)) {
 		ret = PTR_ERR(dentry);
 		goto out;

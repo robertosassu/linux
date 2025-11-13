@@ -22,10 +22,20 @@
 
 #define AUDIT_CAUSE_LEN_MAX 32
 
+bool ima_flush_htable;
+static int __init ima_flush_htable_setup(char *str)
+{
+	ima_flush_htable = true;
+	return 1;
+}
+__setup("ima_flush_htable", ima_flush_htable_setup);
+
 /* pre-allocated array of tpm_digest structures to extend a PCR */
 static struct tpm_digest *digests;
 
 LIST_HEAD(ima_measurements);	/* list of all measurements */
+LIST_HEAD(ima_measurements_snap); /* list of measurements in the snapshot */
+bool ima_measurement_snap_exists; /* If the snapshot exists or not */
 #ifdef CONFIG_IMA_KEXEC
 static unsigned long binary_runtime_size;
 #else
@@ -218,6 +228,62 @@ out:
 	integrity_audit_msg(AUDIT_INTEGRITY_PCR, inode, filename,
 			    op, audit_cause, result, audit_info);
 	return result;
+}
+
+int ima_queue_make_snapshot(void)
+{
+	struct ima_queue_entry *qe;
+
+	if (ima_measurement_snap_exists)
+		return -EEXIST;
+
+	mutex_lock(&ima_extend_list_mutex);
+	if (list_empty(&ima_measurements)) {
+		mutex_unlock(&ima_extend_list_mutex);
+		return -ENOENT;
+	}
+
+	list_replace(&ima_measurements, &ima_measurements_snap);
+	INIT_LIST_HEAD(&ima_measurements);
+	if (IS_ENABLED(CONFIG_IMA_KEXEC))
+		binary_runtime_size = 0;
+
+	if (ima_flush_htable) {
+		list_for_each_entry(qe, &ima_measurements_snap, later)
+			hlist_del_rcu(&qe->hnext);
+	}
+
+	mutex_unlock(&ima_extend_list_mutex);
+	ima_measurement_snap_exists = true;
+	return 0;
+}
+
+int ima_queue_delete_snapshot(void)
+{
+	struct ima_queue_entry *qe, *qe_tmp;
+	unsigned int i;
+
+	if (!ima_measurement_snap_exists)
+		return -ENOENT;
+
+	list_for_each_entry_safe(qe, qe_tmp, &ima_measurements_snap, later) {
+		for (i = 0; i < qe->entry->template_desc->num_fields; i++) {
+			kfree(qe->entry->template_data[i].data);
+			qe->entry->template_data[i].data = NULL;
+			qe->entry->template_data[i].len = 0;
+		}
+
+		list_del(&qe->later);
+
+		if (ima_flush_htable) {
+			kfree(qe->entry->digests);
+			kfree(qe->entry);
+			kfree(qe);
+		}
+	}
+
+	ima_measurement_snap_exists = false;
+	return 0;
 }
 
 int ima_restore_measurement_entry(struct ima_template_entry *entry)

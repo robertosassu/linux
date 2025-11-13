@@ -117,6 +117,8 @@ struct ima_queue_entry {
 	struct ima_template_entry *entry;
 };
 extern struct list_head ima_measurements;	/* list of all measurements */
+extern struct list_head ima_measurements_snap;	/* list of measur. in snap. */
+extern bool ima_measurement_snap_exists;	/* If the snap. exists or not */
 
 /* Some details preceding the binary serialized measurement list */
 struct ima_kexec_hdr {
@@ -281,6 +283,8 @@ struct ima_template_desc *ima_template_desc_current(void);
 struct ima_template_desc *ima_template_desc_buf(void);
 struct ima_template_desc *lookup_template_desc(const char *name);
 bool ima_template_has_modsig(const struct ima_template_desc *ima_template);
+int ima_queue_make_snapshot(void);
+int ima_queue_delete_snapshot(void);
 int ima_restore_measurement_entry(struct ima_template_entry *entry);
 int ima_restore_measurement_list(loff_t bufsize, void *buf);
 int ima_measurements_show(struct seq_file *m, void *v);
