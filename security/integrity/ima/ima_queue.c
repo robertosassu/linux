@@ -371,6 +371,76 @@ int ima_queue_staged_delete_all(void)
 	return 0;
 }
 
+int ima_queue_staged_delete_partial(unsigned long req_value)
+{
+	unsigned long req_value_copy = req_value;
+	unsigned long size_to_remove = 0, num_to_remove = 0;
+	struct list_head *cut_pos = NULL;
+	LIST_HEAD(ima_measurements_trim);
+	struct ima_queue_entry *qe;
+	int ret = 0;
+
+	/*
+	 * Safe walk (no concurrent write), not under ima_extend_list_mutex
+	 * for performance reasons.
+	 */
+	list_for_each_entry(qe, &ima_measurements_staged, later) {
+		size_to_remove += get_binary_runtime_size(qe->entry);
+		num_to_remove++;
+
+		if (--req_value_copy == 0) {
+			/* qe->later always points to a valid list entry. */
+			cut_pos = &qe->later;
+			break;
+		}
+	}
+
+	/* Nothing to remove, undoing staging. */
+	if (req_value_copy > 0) {
+		size_to_remove = 0;
+		num_to_remove = 0;
+		ret = -ENOENT;
+	}
+
+	mutex_lock(&ima_extend_list_mutex);
+	if (list_empty(&ima_measurements_staged)) {
+		mutex_unlock(&ima_extend_list_mutex);
+		return -ENOENT;
+	}
+
+	if (cut_pos != NULL)
+		/*
+		 * ima_dump_measurement_list() does not modify the list,
+		 * cut_pos remains the same even if it was computed before
+		 * the lock.
+		 */
+		__list_cut_position(&ima_measurements_trim,
+				    &ima_measurements_staged, cut_pos);
+
+	atomic_long_sub(num_to_remove, &ima_num_entries[BINARY_STAGED]);
+	atomic_long_add(atomic_long_read(&ima_num_entries[BINARY_STAGED]),
+			&ima_num_entries[BINARY]);
+	atomic_long_set(&ima_num_entries[BINARY_STAGED], 0);
+
+	if (IS_ENABLED(CONFIG_IMA_KEXEC)) {
+		binary_runtime_size[BINARY_STAGED] -= size_to_remove;
+		binary_runtime_size[BINARY] +=
+					binary_runtime_size[BINARY_STAGED];
+		binary_runtime_size[BINARY_STAGED] = 0;
+	}
+
+	/*
+	 * Splice (prepend) any remaining non-deleted staged entries to the
+	 * active list (RCU not needed, there cannot be concurrent readers).
+	 */
+	list_splice(&ima_measurements_staged, &ima_measurements);
+	INIT_LIST_HEAD(&ima_measurements_staged);
+	mutex_unlock(&ima_extend_list_mutex);
+
+	ima_queue_delete(&ima_measurements_trim, false);
+	return ret;
+}
+
 static void ima_queue_delete(struct list_head *head, bool flush_htable)
 {
 	struct ima_queue_entry *qe, *qe_tmp;
