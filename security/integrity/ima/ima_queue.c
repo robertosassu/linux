@@ -72,6 +72,13 @@ DEFINE_MUTEX(ima_extend_list_mutex);
  */
 static bool ima_measurements_suspended;
 
+/*
+ * Used to determine if staged measurements were prepended during kexec,
+ * so that an error can be sent to user space during deletion, and they don't
+ * store staged measurements twice.
+ */
+bool ima_staged_measurements_prepended;
+
 /* Callers must call synchronize_rcu() and free the hash table. */
 static struct hlist_head *ima_alloc_replace_htable(void)
 {
@@ -344,6 +351,11 @@ int ima_queue_staged_delete_all(void)
 		return -ENOENT;
 	}
 
+	if (ima_staged_measurements_prepended) {
+		mutex_unlock(&ima_extend_list_mutex);
+		return -ESTALE;
+	}
+
 	list_replace(&ima_measurements_staged, &ima_measurements_trim);
 	INIT_LIST_HEAD(&ima_measurements_staged);
 
@@ -406,6 +418,11 @@ int ima_queue_staged_delete_partial(unsigned long req_value)
 	if (list_empty(&ima_measurements_staged)) {
 		mutex_unlock(&ima_extend_list_mutex);
 		return -ENOENT;
+	}
+
+	if (ima_staged_measurements_prepended) {
+		mutex_unlock(&ima_extend_list_mutex);
+		return -ESTALE;
 	}
 
 	if (cut_pos != NULL)

@@ -116,6 +116,9 @@ static int ima_dump_measurement_list(unsigned long *buffer_size, void **buffer,
 			break;
 	}
 
+	if (!list_empty(&ima_measurements_staged))
+		ima_staged_measurements_prepended = true;
+
 	list_for_each_entry_rcu(qe, &ima_measurements, later,
 				lockdep_is_held(&ima_extend_list_mutex)) {
 		if (!ret)
